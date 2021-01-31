@@ -127,6 +127,7 @@ jobs:
         echo "dtparam=i2c_arm=on,audio=on" >> target/linux/bcm27xx/image/config.txt
         mkdir -p files/etc/uci-defaults/
         cp ../scripts/init-settings.sh files/etc/uci-defaults/99-init-settings
+        chmod +x files/etc/uci-defaults/99-init-settings
         mkdir -p files/bin
         cp ../scripts/ipv6-helper.sh files/bin/ipv6-helper
         chmod +x files/bin/ipv6-helper

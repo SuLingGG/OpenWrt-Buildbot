@@ -141,7 +141,7 @@ jobs:
         gzip *.img
 
     - name: Download Extra Packages
-      if: steps.compile.outputs.GENERATE_STATUS == 'success'
+      if: steps.generate.outputs.GENERATE_STATUS == 'success'
       run: |
         cd $OPENWRTROOT
         rm -rf tmp .config*
@@ -153,7 +153,7 @@ jobs:
         find dl -size -1024c -exec rm -f {} \;
 
     - name: Compile Extra Packages
-      if: steps.compile.outputs.GENERATE_STATUS == 'success'
+      if: steps.generate.outputs.GENERATE_STATUS == 'success'
       run: |
         cd $OPENWRTROOT
         make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1

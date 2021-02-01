@@ -124,6 +124,9 @@ jobs:
         make package/install -j$(nproc) || make package/install -j1 V=s
         make target/install -j$(nproc) || make target/install -j1 V=s
         make checksum
+        cd $FIRMWARE
+        mkdir -p $OPENWRTROOT/firmware
+        mv `ls | grep -v "packages"` $OPENWRTROOT/firmware
         echo "::set-output name=GENERATE_STATUS::success"
 
     - name: Compress Img Files
@@ -160,6 +163,7 @@ jobs:
       if: steps.generate.outputs.GENERATE_STATUS == 'success' && env.UPLOAD_RCLONE == 'true' && env.RCLONE_PACKAGE != ''
       run: |
         cd $OPENWRTROOT
+        cp -f firmware/* $FIRMWARE
         rclone copy bin $RCLONE_PACKAGE:$(date +"%Y-%m-%d")
         rclone purge $RCLONE_PACKAGE:latest/packages/$PLATFORM > /dev/null 2>&1 || true
         rclone purge $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET > /dev/null 2>&1 || true

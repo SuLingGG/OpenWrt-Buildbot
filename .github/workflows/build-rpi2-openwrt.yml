@@ -86,7 +86,7 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
-    - name: Compile Firmware-Based Packages
+    - name: Compile Firmware Packages
       id: compile
       run: |
         cd $OPENWRTROOT
@@ -127,6 +127,7 @@ jobs:
         echo "dtparam=i2c_arm=on,audio=on" >> target/linux/bcm27xx/image/config.txt
         mkdir -p files/etc/uci-defaults/
         cp ../scripts/init-settings.sh files/etc/uci-defaults/99-init-settings
+        chmod +x files/etc/uci-defaults/99-init-settings
         mkdir -p files/bin
         cp ../scripts/ipv6-helper.sh files/bin/ipv6-helper
         chmod +x files/bin/ipv6-helper
@@ -136,7 +137,7 @@ jobs:
         echo "::set-output name=GENERATE_STATUS::success"
 
     - name: Download Extra Packages
-      if: env.GENERATE_STATUS == 'success'
+      if: steps.compile.outputs.GENERATE_STATUS == 'success'
       run: |
         cd $OPENWRTROOT
         rm -rf tmp .config*
@@ -148,7 +149,7 @@ jobs:
         find dl -size -1024c -exec rm -f {} \;
 
     - name: Compile Extra Packages
-      if: env.GENERATE_STATUS == 'success'
+      if: steps.compile.outputs.GENERATE_STATUS == 'success'
       run: |
         cd $OPENWRTROOT
         make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1

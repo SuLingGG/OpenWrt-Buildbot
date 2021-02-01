@@ -86,7 +86,7 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
-    - name: Compile Firmware-Based Packages
+    - name: Compile Firmware Packages
       id: compile
       run: |
         cd $OPENWRTROOT
@@ -137,7 +137,7 @@ jobs:
         echo "::set-output name=GENERATE_STATUS::success"
 
     - name: Download Extra Packages
-      if: env.GENERATE_STATUS == 'success'
+      if: steps.compile.outputs.GENERATE_STATUS == 'success'
       run: |
         cd $OPENWRTROOT
         rm -rf tmp .config*
@@ -149,7 +149,7 @@ jobs:
         find dl -size -1024c -exec rm -f {} \;
 
     - name: Compile Extra Packages
-      if: env.GENERATE_STATUS == 'success'
+      if: steps.compile.outputs.GENERATE_STATUS == 'success'
       run: |
         cd $OPENWRTROOT
         make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1

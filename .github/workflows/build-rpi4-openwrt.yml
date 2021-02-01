@@ -136,7 +136,6 @@ jobs:
         cd $OPENWRTROOT
         rm -f .config*
         make clean
-        make clean
         cp ../$CONFIG_FILE ./.config
         cat ../config/packages-extra.config >> $OPENWRTROOT/.config
         make defconfig

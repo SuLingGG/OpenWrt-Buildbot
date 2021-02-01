@@ -30,12 +30,6 @@ jobs:
   Build:
     runs-on: project-gdock
 
-    outputs:
-      PLATFORM: ${{ steps.compile.outputs.PLATFORM }}
-      TARGET: ${{ steps.compile.outputs.TARGET }}
-      SUBTARGET: ${{ steps.compile.outputs.SUBTARGET }}
-      GENERATE_STATUS: ${{ steps.generate.outputs.GENERATE_STATUS }}
-
     steps:
     - name: Checkout
       uses: actions/checkout@main
@@ -45,7 +39,7 @@ jobs:
         DEBIAN_FRONTEND: noninteractive
       run: |
         sudo -E apt-get -qq update
-        sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804) tree
+        sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804）
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
 
@@ -77,7 +71,7 @@ jobs:
         ../scripts/preset-clash-core.sh armv7
         ../scripts/preset-terminal-tools.sh
 
-    - name: Download Package
+    - name: Download Firmware Packages
       id: package
       run: |
         cd $OPENWRTROOT
@@ -134,82 +128,38 @@ jobs:
         make target/install -j$(nproc) || make target/install -j1 V=s
         make checksum
         echo "::set-output name=GENERATE_STATUS::success"
+        
+    - name: Rclone Upload
+      env:
+        RCLONE_PACKAGE: ${{ secrets.RCLONE_PACKAGE }}
+        RCLONE_FIRMWARE: ${{ secrets.RCLONE_FIRMWARE }}
+      if: steps.generate.outputs.GENERATE_STATUS == 'success' && env.UPLOAD_RCLONE == 'true' && env.RCLONE_PACKAGE != ''
+      run: |
+        cd $OPENWRTROOT
+        rclone copy bin/targets/$TARGET/$SUBTARGET $RCLONE_PACKAGE:$(date +"%Y-%m-%d")/targets/$TARGET/$SUBTARGET
+        rclone purge $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET > /dev/null 2>&1 || true
+        rclone copy $RCLONE_PACKAGE:$(date +"%Y-%m-%d")/targets/$TARGET/$SUBTARGET $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET
+        echo "::warning file=Download-Link::https://openwrt.cc/snapshots/latest/targets/$TARGET/$SUBTARGET"
 
-    - name: Upload Bin Folder
-      uses: actions/upload-artifact@main
+    - name: Organize Files
+      id: organize
       if: steps.generate.outputs.GENERATE_STATUS == 'success'
-      with:
-        name: bin-archive
-        path: openwrt/bin
-        
-  Upload:
-    needs: [Build]
-    runs-on: ubuntu-18.04
+      run: |
+        cd $OPENWRTROOT/bin/targets/$TARGET/$SUBTARGET
+        rm -rf packages
+        df -hT $PWD
+        echo "::set-output name=ORGANIZE_STATUS::success"
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@main
-        
-      - name: Restore Variables
-        run: |
-          echo "PLATFORM=$(echo '${{needs.Build.outputs.PLATFORM}}')" >> $GITHUB_ENV
-          echo "TARGET=$(echo '${{needs.Build.outputs.TARGET}}')" >> $GITHUB_ENV
-          echo "SUBTARGET=$(echo '${{needs.Build.outputs.SUBTARGET}}')" >> $GITHUB_ENV
-          echo "GENERATE_STATUS=$(echo '${{needs.Build.outputs.GENERATE_STATUS}}')" >> $GITHUB_ENV
-        
-      - name: Download Bin Folder
-        uses: actions/download-artifact@v2
-        if: env.GENERATE_STATUS == 'success'
-        with:
-          name: bin-archive
-          path: openwrt/bin
+    - name: Upload Firmware To CowTransfer
+      if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_COWTRANSFER == 'true'
+      run: |
+        cd $OPENWRTROOT
+        transfer cow --block 2621440 -s -p 64 --no-progress ${FIRMWARE} 2>&1 | tee cowtransfer.log
+        echo "::warning file=Firmware-Cowtransfer.com::$(cat cowtransfer.log | grep https)"
 
-      - name: Rclone Upload
-        env:
-          RCLONE_PACKAGE: ${{ secrets.RCLONE_PACKAGE }}
-          RCLONE_FIRMWARE: ${{ secrets.RCLONE_FIRMWARE }}
-        if: env.GENERATE_STATUS == 'success' && env.UPLOAD_RCLONE == 'true' && env.RCLONE_PACKAGE != ''
-        run: |
-          cd openwrt
-          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
-          curl https://rclone.org/install.sh | sudo bash
-          mkdir -p ~/.config/rclone/
-          cat << EOF > ~/.config/rclone/rclone.conf
-          ${{ secrets.RCLONE_CONFIG }}
-          EOF
-          rclone copy bin/targets/$TARGET/$SUBTARGET $RCLONE_PACKAGE:$(date +"%Y-%m-%d")/targets/$TARGET/$SUBTARGET
-          rclone purge $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET > /dev/null 2>&1 || true
-          rclone copy $RCLONE_PACKAGE:$(date +"%Y-%m-%d")/targets/$TARGET/$SUBTARGET $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET
-          echo "::warning file=Download-Link::https://openwrt.cc/snapshots/latest/targets/$TARGET/$SUBTARGET"
-
-      - name: Organize Files
-        id: organize
-        if: env.GENERATE_STATUS == 'success'
-        run: |
-          cd $OPENWRTROOT/bin/targets/$TARGET/$SUBTARGET
-          echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-          rm -rf packages
-          cd $OPENWRTROOT/bin/targets/$TARGET/
-          curl -fsSL git.io/file-transfer | sh
-          df -hT $PWD
-          echo "::set-output name=ORGANIZE_STATUS::success"
-
-      - name: Upload Firmware To CowTransfer
-        if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_COWTRANSFER == 'true'
-        run: |
-          cd $OPENWRTROOT/bin/targets/$TARGET/
-          ./transfer cow --block 2621440 -s -p 64 --no-progress ${FIRMWARE} 2>&1 | tee cowtransfer.log
-          echo "::warning file=Firmware-Cowtransfer.com::$(cat cowtransfer.log | grep https)"
-
-      - name: Upload Firmware To WeTransfer
-        if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_WETRANSFER == 'true'
-        run: |
-          cd $OPENWRTROOT/bin/targets/$TARGET/
-          ./transfer wet -s -p 16 --no-progress ${FIRMWARE} 2>&1 | tee wetransfer.log
-          echo "::warning file=Firmware-Wetransfer.com::$(cat wetransfer.log | grep https)"
-
-      - name: Delete Artifacts
-        uses: geekyeggo/delete-artifact@v1
-        with:
-          name: |
-            bin-archive
+    - name: Upload Firmware To WeTransfer
+      if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_WETRANSFER == 'true'
+      run: |
+        cd $OPENWRTROOT
+        transfer wet -s -p 16 --no-progress ${FIRMWARE} 2>&1 | tee wetransfer.log
+        echo "::warning file=Firmware-Wetransfer.com::$(cat wetransfer.log | grep https)"

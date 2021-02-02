@@ -169,8 +169,8 @@ jobs:
         if: steps.generate.outputs.GENERATE_STATUS == 'success'
         run: |
           cd $OPENWRTROOT
-          cp -f output/* $FIRMWARE
-          zip -qs 200m -r output/bin-archive.zip bin
+          mv -f output/* $FIRMWARE
+          zip -q -s 200m -r output/bin-archive.zip bin
 
       - name: Upload Bin Archive
         uses: actions/upload-artifact@main
@@ -208,7 +208,7 @@ jobs:
           cd openwrt
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
           cd output
-          zip -qs 0 bin-archive.zip --out ../bin.zip
+          zip -q -s 0 bin-archive.zip --out ../bin.zip
           cd $OPENWRTROOT
           unzip -q bin.zip
 

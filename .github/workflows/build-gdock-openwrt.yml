@@ -178,12 +178,17 @@ jobs:
       - name: Decompress Bin Folder
         if: env.GENERATE_STATUS == 'success'
         run: |
+          sudo apt update && sudo apt install tree -y
           cd openwrt
+          tree .
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
           cd output
+          tree .
           zip -s 0 bin-archive.zip --out ../bin.zip
           cd ..
+          tree .
           unzip bin.zip
+          tree .
 
       - name: Rclone Upload
         env:

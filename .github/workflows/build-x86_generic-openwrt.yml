@@ -151,8 +151,8 @@ jobs:
         if: steps.generate.outputs.GENERATE_STATUS == 'success'
         run: |
           cd $OPENWRTROOT
-          rm -f .config*
           make clean
+          rm -f .config*
           cp ../$CONFIG_FILE ./.config
           cat ../config/packages-extra.config >> $OPENWRTROOT/.config
           make defconfig

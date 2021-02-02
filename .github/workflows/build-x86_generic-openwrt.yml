@@ -30,202 +30,263 @@ jobs:
   Build:
     runs-on: project-x86_generic
 
+    outputs:
+      PLATFORM: ${{ steps.compile.outputs.PLATFORM }}
+      TARGET: ${{ steps.compile.outputs.TARGET }}
+      SUBTARGET: ${{ steps.compile.outputs.SUBTARGET }}
+      DATE: ${{ steps.compile.outputs.DATE }}
+      GENERATE_STATUS: ${{ steps.generate.outputs.GENERATE_STATUS }}
+
     steps:
-    - name: Checkout
-      uses: actions/checkout@main
+      - name: Checkout
+        uses: actions/checkout@main
 
-    - name: Initialization Environment
-      env:
-        DEBIAN_FRONTEND: noninteractive
-      run: |
-        sudo -E apt-get -qq update
-        sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804)
-        sudo -E apt-get -qq autoremove --purge
-        sudo -E apt-get -qq clean
+      - name: Initialization Environment
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804)
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
 
-    - name: Clone Source Code
-      run: |
-        df -hT $PWD
-        git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+      - name: Clone Source Code
+        run: |
+          df -hT $PWD
+          git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
 
-    - name: Update Feeds
-      id: update
-      run: |
-        cd openwrt
-        echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
-        ./scripts/feeds update -a
+      - name: Update Feeds
+        id: update
+        run: |
+          cd openwrt
+          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
+          ./scripts/feeds update -a
 
-    - name: Install Feeds
-      run: |
-        cd $OPENWRTROOT
-        ./scripts/feeds install -a
+      - name: Install Feeds
+        run: |
+          cd $OPENWRTROOT
+          ./scripts/feeds install -a
 
-    - name: Load Custom Configuration
-      run: |
-        [ -e files ] && mv files $OPENWRTROOT/files
-        cp $CONFIG_FILE $OPENWRTROOT/.config
-        cat config/firmware-extra.config >> $OPENWRTROOT/.config
-        chmod +x scripts/*.sh
-        cd $OPENWRTROOT
-        ../$DIY_SH
-        ../scripts/preset-clash-core.sh 386
-        ../scripts/preset-terminal-tools.sh
+      - name: Load Custom Configuration
+        run: |
+          [ -e files ] && mv files $OPENWRTROOT/files
+          cp $CONFIG_FILE $OPENWRTROOT/.config
+          cat config/firmware-extra.config >> $OPENWRTROOT/.config
+          chmod +x scripts/*.sh
+          cd $OPENWRTROOT
+          ../$DIY_SH
+          ../scripts/preset-clash-core.sh 386
+          ../scripts/preset-terminal-tools.sh
 
-    - name: Download Firmware Packages
-      id: package
-      run: |
-        cd $OPENWRTROOT
-        make defconfig
-        make download -j$(nproc)
-        find dl -size -1024c -exec ls -l {} \;
-        find dl -size -1024c -exec rm -f {} \;
+      - name: Download Firmware Packages
+        id: package
+        run: |
+          cd $OPENWRTROOT
+          make defconfig
+          make download -j$(nproc)
+          find dl -size -1024c -exec ls -l {} \;
+          find dl -size -1024c -exec rm -f {} \;
 
-    - name: Compile Firmware Packages
-      id: compile
-      run: |
-        cd $OPENWRTROOT
-        echo -e "$(nproc) thread compile"
-        make tools/compile -j$(nproc) || make tools/compile -j1 V=s
-        make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
-        make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
-        make diffconfig
-        make package/compile -j$(nproc) IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
-        make package/index
-        cd $OPENWRTROOT/bin/packages/*
-        PLATFORM=$(basename `pwd`)
-        echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
-        cd $OPENWRTROOT/bin/targets/*
-        TARGET=$(basename `pwd`)
-        echo "TARGET=$TARGET" >> $GITHUB_ENV
-        cd *
-        SUBTARGET=$(basename `pwd`)
-        echo "SUBTARGET=$SUBTARGET" >> $GITHUB_ENV
-        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-        echo "::set-output name=COMPILE_STATUS::success"
+      - name: Compile Firmware Packages
+        id: compile
+        run: |
+          cd $OPENWRTROOT
+          echo -e "$(nproc) thread compile"
+          make tools/compile -j$(nproc) || make tools/compile -j1 V=s
+          make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
+          make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
+          make diffconfig
+          make package/compile -j$(nproc) IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
+          make package/index
+          cd $OPENWRTROOT/bin/packages/*
+          PLATFORM=$(basename `pwd`)
+          echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
+          echo "::set-output name=PLATFORM::$(echo $PLATFORM)"
+          cd $OPENWRTROOT/bin/targets/*
+          TARGET=$(basename `pwd`)
+          echo "TARGET=$TARGET" >> $GITHUB_ENV
+          echo "::set-output name=TARGET::$(echo $TARGET)"
+          cd *
+          SUBTARGET=$(basename `pwd`)
+          echo "SUBTARGET=$SUBTARGET" >> $GITHUB_ENV
+          echo "::set-output name=SUBTARGET::$(echo $SUBTARGET)"
+          echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+          echo "::set-output name=FIRMWARE::$(echo $PWD)"
+          echo "DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+          echo "::set-output name=DATE::$(echo $DATE)"
+          echo "::set-output name=COMPILE_STATUS::success"
 
-    - name: Generate Firmware
-      if: steps.compile.outputs.COMPILE_STATUS == 'success'
-      id: generate
-      run: |
-        cd data/opkg
-        sed -i "s/subtarget/$SUBTARGET/g" distfeeds.conf
-        sed -i "s/target\//$TARGET\//g" distfeeds.conf
-        sed -i "s/platform/$PLATFORM/g" distfeeds.conf
-        sed -i "s/date/$(date +"%Y-%m-%d")/g" distfeeds.conf
-        cd $OPENWRTROOT
-        mkdir -p files/etc/opkg
-        cp ../data/opkg/distfeeds.conf files/etc/opkg/distfeeds.conf
-        mkdir -p files/etc/uci-defaults/
-        cp ../scripts/init-settings.sh files/etc/uci-defaults/99-init-settings
-        chmod +x files/etc/uci-defaults/99-init-settings
-        mkdir -p files/bin
-        cp ../scripts/ipv6-helper.sh files/bin/ipv6-helper
-        chmod +x files/bin/ipv6-helper
-        make package/install -j$(nproc) || make package/install -j1 V=s
-        make target/install -j$(nproc) || make target/install -j1 V=s
-        make checksum
-        cd $FIRMWARE
-        mkdir -p $OPENWRTROOT/firmware
-        mv `ls | grep -v "packages"` $OPENWRTROOT/firmware
-        echo "::set-output name=GENERATE_STATUS::success"
+      - name: Generate Firmware
+        if: steps.compile.outputs.COMPILE_STATUS == 'success'
+        id: generate
+        run: |
+          cd data/opkg
+          sed -i "s/subtarget/$SUBTARGET/g" distfeeds.conf
+          sed -i "s/target\//$TARGET\//g" distfeeds.conf
+          sed -i "s/platform/$PLATFORM/g" distfeeds.conf
+          sed -i "s/date/$DATE/g" distfeeds.conf
+          cd $OPENWRTROOT
+          mkdir -p files/etc/opkg
+          cp ../data/opkg/distfeeds.conf files/etc/opkg/distfeeds.conf
+          mkdir -p files/etc/uci-defaults/
+          cp ../scripts/init-settings.sh files/etc/uci-defaults/99-init-settings
+          chmod +x files/etc/uci-defaults/99-init-settings
+          mkdir -p files/bin
+          cp ../scripts/ipv6-helper.sh files/bin/ipv6-helper
+          chmod +x files/bin/ipv6-helper
+          make package/install -j$(nproc) || make package/install -j1 V=s
+          make target/install -j$(nproc) || make target/install -j1 V=s
+          make checksum
+          cd $FIRMWARE
+          mkdir -p $OPENWRTROOT/output
+          mv `ls | grep -v "packages"` $OPENWRTROOT/output
+          echo "::set-output name=GENERATE_STATUS::success"
 
-    - name: Compress Img Files
-      run: |
-        cd ${FIRMWARE}
-        gzip *.img
+      - name: Compress Img Files
+        run: |
+          cd ${FIRMWARE}
+          gzip *.img
 
-    - name: Download Extra Packages
-      if: steps.generate.outputs.GENERATE_STATUS == 'success'
-      run: |
-        cd $OPENWRTROOT
-        rm -f .config*
-        make clean
-        cp ../$CONFIG_FILE ./.config
-        cat ../config/packages-extra.config >> $OPENWRTROOT/.config
-        make defconfig
-        make download -j$(nproc)
-        find dl -size -1024c -exec ls -l {} \;
-        find dl -size -1024c -exec rm -f {} \;
+      - name: Download Extra Packages
+        if: steps.generate.outputs.GENERATE_STATUS == 'success'
+        run: |
+          cd $OPENWRTROOT
+          rm -f .config*
+          make clean
+          cp ../$CONFIG_FILE ./.config
+          cat ../config/packages-extra.config >> $OPENWRTROOT/.config
+          make defconfig
+          make download -j$(nproc)
+          find dl -size -1024c -exec ls -l {} \;
+          find dl -size -1024c -exec rm -f {} \;
 
-    - name: Compile Extra Packages
-      if: steps.generate.outputs.GENERATE_STATUS == 'success'
-      run: |
-        cd $OPENWRTROOT
-        make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
-        make diffconfig
-        make package/compile -j$(nproc) IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
-        make package/index
-        
-    - name: Rclone Upload
-      env:
-        RCLONE_PACKAGE: ${{ secrets.RCLONE_PACKAGE }}
-        RCLONE_FIRMWARE: ${{ secrets.RCLONE_FIRMWARE }}
-      if: steps.generate.outputs.GENERATE_STATUS == 'success' && env.UPLOAD_RCLONE == 'true' && env.RCLONE_PACKAGE != ''
-      run: |
-        cd $OPENWRTROOT
-        cp -f firmware/* $FIRMWARE
-        rclone copy bin $RCLONE_PACKAGE:$(date +"%Y-%m-%d")
-        rclone purge $RCLONE_PACKAGE:latest/packages/$PLATFORM > /dev/null 2>&1 || true
-        rclone purge $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET > /dev/null 2>&1 || true
-        rclone copy $RCLONE_PACKAGE:$(date +"%Y-%m-%d")/packages/$PLATFORM $RCLONE_PACKAGE:latest/packages/$PLATFORM
-        rclone copy $RCLONE_PACKAGE:$(date +"%Y-%m-%d")/targets/$TARGET/$SUBTARGET $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET
-        echo "::warning file=Download-Link::https://openwrt.cc/snapshots/latest/targets/$TARGET/$SUBTARGET"
+      - name: Compile Extra Packages
+        if: steps.generate.outputs.GENERATE_STATUS == 'success'
+        run: |
+          cd $OPENWRTROOT
+          make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
+          make diffconfig
+          make package/compile -j$(nproc) IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
+          make package/index
 
-    - name: Organize Files
-      id: organize
-      if: steps.generate.outputs.GENERATE_STATUS == 'success' && !cancelled()
-      run: |
-        cd $OPENWRTROOT/bin/targets/$TARGET/$SUBTARGET
-        rm -rf packages
-        cd $OPENWRTROOT/bin/targets/$TARGET/
-        mkdir -p uefi-images
-        mkdir -p legacy-images
-        mkdir -p other-files
-        mv $SUBTARGET/*combined-efi* uefi-images
-        mv $SUBTARGET/*combined* legacy-images
-        mv $SUBTARGET/* other-files
-        df -hT $PWD
-        echo "::set-output name=ORGANIZE_STATUS::success"
-        
-    - name: Upload Uefi Firmwares To Cowtransfer
-      if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_COWTRANSFER == 'true'
-      run: |
-        cd $OPENWRTROOT/bin/targets/$TARGET
-        transfer cow --block 2621440 -s -p 64 --no-progress ./uefi-images 2>&1 | tee cowtransfer-uefi.log
-        echo "::warning file=Cowtransfer-UEFI=::$(cat cowtransfer-uefi.log | grep https)"
-        
-    - name: Upload Legacy Firmwares To Cowtransfer
-      if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_COWTRANSFER == 'true'
-      run: |
-        cd $OPENWRTROOT
-        transfer cow --block 2621440 -s -p 64 --no-progress ./legacy-images 2>&1 | tee cowtransfer-legacy.log
-        echo "::warning file=Cowtransfer-Legacy=::$(cat cowtransfer-legacy.log | grep https)"
-        
-    - name: Upload Other Files To Cowtransfer
-      if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_COWTRANSFER == 'true'
-      run: |
-        cd $OPENWRTROOT
-        transfer cow --block 2621440 -s -p 64 --no-progress ./other-files 2>&1 | tee cowtransfer-other.log
-        echo "::warning file=Cowtransfer-OtherFiles=::$(cat cowtransfer-other.log | grep https)"
-        
-    - name: Upload Uefi Firmwares To WeTransfer
-      if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_WETRANSFER == 'true'
-      run: |
-        cd $OPENWRTROOT/bin/targets/$TARGET
-        transfer wet -s -p 16 --no-progress ./uefi-images 2>&1 | tee wetransfer-uefi.log
-        echo "::warning file=Wetransfer-UEFI=::$(cat wetransfer-uefi.log | grep https)"
-        
-    - name: Upload Legacy Firmwares To WeTransfer
-      if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_WETRANSFER == 'true'
-      run: |
-        cd $OPENWRTROOT
-        transfer wet -s -p 16 --no-progress ./legacy-images 2>&1 | tee wetransfer-legacy.log
-        echo "::warning file=Wetransfer-Legacy::$(cat wetransfer-legacy.log | grep https)"
-        
-    - name: Upload Other Files To WeTransfer
-      if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_WETRANSFER == 'true'
-      run: |
-        cd $OPENWRTROOT
-        transfer wet -s -p 16 --no-progress ./other-files 2>&1 | tee wetransfer-other.log
-        echo "::warning file=Wetransfer-OtherFiles::$(cat wetransfer-other.log | grep https)"
-        
+      - name: Compress Bin Folder
+        if: steps.generate.outputs.GENERATE_STATUS == 'success'
+        run: |
+          cd $OPENWRTROOT
+          cp -f output/* $FIRMWARE
+          zip -qs 200m -r output/bin-archive.zip bin
+
+      - name: Upload Bin Archive
+        uses: actions/upload-artifact@main
+        if: steps.generate.outputs.GENERATE_STATUS == 'success'
+        with:
+          name: bin-archive
+          path: openwrt/output
+
+  Upload:
+    needs: [Build]
+    runs-on: ubuntu-18.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Restore Variables
+        run: |
+          echo "PLATFORM=$(echo '${{needs.Build.outputs.PLATFORM}}')" >> $GITHUB_ENV
+          echo "TARGET=$(echo '${{needs.Build.outputs.TARGET}}')" >> $GITHUB_ENV
+          echo "SUBTARGET=$(echo '${{needs.Build.outputs.SUBTARGET}}')" >> $GITHUB_ENV
+          echo "DATE=$(echo '${{needs.Build.outputs.DATE}}')" >> $GITHUB_ENV
+          echo "GENERATE_STATUS=$(echo '${{needs.Build.outputs.GENERATE_STATUS}}')" >> $GITHUB_ENV
+
+      - name: Download Bin Folder
+        uses: actions/download-artifact@v2
+        if: env.GENERATE_STATUS == 'success'
+        with:
+          name: bin-archive
+          path: openwrt/output
+
+      - name: Decompress Bin Folder
+        if: env.GENERATE_STATUS == 'success'
+        run: |
+          cd openwrt
+          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
+          cd output
+          zip -qs 0 bin-archive.zip --out ../bin.zip
+          cd $OPENWRTROOT
+          unzip -q bin.zip
+
+      - name: Rclone Upload
+        env:
+          RCLONE_PACKAGE: ${{ secrets.RCLONE_PACKAGE }}
+          RCLONE_FIRMWARE: ${{ secrets.RCLONE_FIRMWARE }}
+        if: env.GENERATE_STATUS == 'success' && env.UPLOAD_RCLONE == 'true' && env.RCLONE_PACKAGE != ''
+        run: |
+          cd $OPENWRTROOT
+          rclone copy bin/targets/$TARGET/$SUBTARGET $RCLONE_PACKAGE:archive/$DATE/targets/$TARGET/$SUBTARGET
+          rclone copy bin/packages/$PLATFORM $RCLONE_PACKAGE:latest/packages/$PLATFORM-temp
+          rclone copy $RCLONE_PACKAGE:archive/$DATE/targets/$TARGET/$SUBTARGET $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET-temp
+          rclone purge $RCLONE_PACKAGE:latest/packages/$PLATFORM > /dev/null 2>&1 || true
+          rclone purge $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET > /dev/null 2>&1 || true
+          rclone moveto $RCLONE_PACKAGE:latest/packages/$PLATFORM-temp $RCLONE_PACKAGE:latest/packages/$PLATFORM
+          rclone moveto $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET-temp $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET
+          echo "::warning file=Download-Link::https://openwrt.cc/snapshots/latest/targets/$TARGET/$SUBTARGET"
+
+      - name: Organize Files
+        id: organize
+        if: env.GENERATE_STATUS == 'success' && !cancelled()
+        run: |
+          cd $OPENWRTROOT/bin/targets/$TARGET/$SUBTARGET
+          echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+          rm -rf packages
+          cd $OPENWRTROOT/bin/targets/$TARGET/
+          mkdir -p uefi-images
+          mkdir -p legacy-images
+          mkdir -p other-files
+          mv $SUBTARGET/*combined-efi* uefi-images
+          mv $SUBTARGET/*combined* legacy-images
+          mv $SUBTARGET/* other-files
+          df -hT $PWD
+          echo "::set-output name=ORGANIZE_STATUS::success"
+
+      - name: Upload Uefi Firmwares To Cowtransfer
+        if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_COWTRANSFER == 'true'
+        run: |
+          cd $OPENWRTROOT/bin/targets/$TARGET
+          transfer cow --block 2621440 -s -p 64 --no-progress ./uefi-images 2>&1 | tee cowtransfer-uefi.log
+          echo "::warning file=Cowtransfer-UEFI=::$(cat cowtransfer-uefi.log | grep https)"
+
+      - name: Upload Legacy Firmwares To Cowtransfer
+        if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_COWTRANSFER == 'true'
+        run: |
+          cd $OPENWRTROOT
+          transfer cow --block 2621440 -s -p 64 --no-progress ./legacy-images 2>&1 | tee cowtransfer-legacy.log
+          echo "::warning file=Cowtransfer-Legacy=::$(cat cowtransfer-legacy.log | grep https)"
+
+      - name: Upload Other Files To Cowtransfer
+        if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_COWTRANSFER == 'true'
+        run: |
+          cd $OPENWRTROOT
+          transfer cow --block 2621440 -s -p 64 --no-progress ./other-files 2>&1 | tee cowtransfer-other.log
+          echo "::warning file=Cowtransfer-OtherFiles=::$(cat cowtransfer-other.log | grep https)"
+
+      - name: Upload Uefi Firmwares To WeTransfer
+        if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_WETRANSFER == 'true'
+        run: |
+          cd $OPENWRTROOT/bin/targets/$TARGET
+          transfer wet -s -p 16 --no-progress ./uefi-images 2>&1 | tee wetransfer-uefi.log
+          echo "::warning file=Wetransfer-UEFI=::$(cat wetransfer-uefi.log | grep https)"
+
+      - name: Upload Legacy Firmwares To WeTransfer
+        if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_WETRANSFER == 'true'
+        run: |
+          cd $OPENWRTROOT
+          transfer wet -s -p 16 --no-progress ./legacy-images 2>&1 | tee wetransfer-legacy.log
+          echo "::warning file=Wetransfer-Legacy::$(cat wetransfer-legacy.log | grep https)"
+
+      - name: Upload Other Files To WeTransfer
+        if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_WETRANSFER == 'true'
+        run: |
+          cd $OPENWRTROOT
+          transfer wet -s -p 16 --no-progress ./other-files 2>&1 | tee wetransfer-other.log
+          echo "::warning file=Wetransfer-OtherFiles::$(cat wetransfer-other.log | grep https)"

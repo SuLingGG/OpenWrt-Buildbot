@@ -34,7 +34,6 @@ jobs:
       PLATFORM: ${{ steps.compile.outputs.PLATFORM }}
       TARGET: ${{ steps.compile.outputs.TARGET }}
       SUBTARGET: ${{ steps.compile.outputs.SUBTARGET }}
-      DATE: ${{ steps.compile.outputs.DATE }}
       GENERATE_STATUS: ${{ steps.generate.outputs.GENERATE_STATUS }}
 
     steps:
@@ -112,8 +111,6 @@ jobs:
           echo "::set-output name=SUBTARGET::$(echo $SUBTARGET)"
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
           echo "::set-output name=FIRMWARE::$(echo $PWD)"
-          echo "DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
-          echo "::set-output name=DATE::$(echo $DATE)"
           echo "::set-output name=COMPILE_STATUS::success"
 
       - name: Generate Firmware
@@ -124,7 +121,7 @@ jobs:
           sed -i "s/subtarget/$SUBTARGET/g" distfeeds.conf
           sed -i "s/target\//$TARGET\//g" distfeeds.conf
           sed -i "s/platform/$PLATFORM/g" distfeeds.conf
-          sed -i "s/date/$DATE/g" distfeeds.conf
+          sed -i "s/date/$(date +'%Y-%m-%d')/g" distfeeds.conf
           cd $OPENWRTROOT
           mkdir -p files/etc/opkg
           cp ../data/opkg/distfeeds.conf files/etc/opkg/distfeeds.conf
@@ -165,7 +162,6 @@ jobs:
           echo "PLATFORM=$(echo '${{needs.Build.outputs.PLATFORM}}')" >> $GITHUB_ENV
           echo "TARGET=$(echo '${{needs.Build.outputs.TARGET}}')" >> $GITHUB_ENV
           echo "SUBTARGET=$(echo '${{needs.Build.outputs.SUBTARGET}}')" >> $GITHUB_ENV
-          echo "DATE=$(echo '${{needs.Build.outputs.DATE}}')" >> $GITHUB_ENV
           echo "GENERATE_STATUS=$(echo '${{needs.Build.outputs.GENERATE_STATUS}}')" >> $GITHUB_ENV
 
       - name: Download Bin Folder
@@ -197,8 +193,8 @@ jobs:
           cat << EOF > ~/.config/rclone/rclone.conf
           ${{ secrets.RCLONE_CONFIG }}
           EOF
-          rclone copy bin/targets/$TARGET/$SUBTARGET $RCLONE_PACKAGE:archive/$DATE/targets/$TARGET/$SUBTARGET
-          rclone copy $RCLONE_PACKAGE:archive/$DATE/targets/$TARGET/$SUBTARGET $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET-temp
+          rclone copy bin/targets/$TARGET/$SUBTARGET $RCLONE_PACKAGE:archive/$(date +'%Y-%m-%d')/targets/$TARGET/$SUBTARGET
+          rclone copy $RCLONE_PACKAGE:archive/$(date +'%Y-%m-%d')/targets/$TARGET/$SUBTARGET $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET-temp
           rclone purge $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET > /dev/null 2>&1 || true
           rclone moveto $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET-temp $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET
           echo "::warning file=Download-Link::https://openwrt.cc/snapshots/latest/targets/$TARGET/$SUBTARGET"
@@ -207,6 +203,9 @@ jobs:
         id: organize
         if: env.GENERATE_STATUS == 'success'
         run: |
+          curl -sL https://git.io/file-transfer | bash -s beta
+          sudo mv transfer /usr/bin
+          sudo chmod +x /usr/bin/transfer
           cd $OPENWRTROOT/bin/targets/$TARGET/$SUBTARGET
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
           rm -rf packages

@@ -208,9 +208,9 @@ jobs:
           cd openwrt
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
           cd output
-          zip -q -s 0 bin-archive.zip --out ../bin.zip
-          cd $OPENWRTROOT
-          unzip -q bin.zip
+          zip -s 0 bin-archive.zip --out ../bin.zip
+          cd ..
+          unzip bin.zip
 
       - name: Rclone Upload
         env:

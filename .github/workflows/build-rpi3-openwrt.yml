@@ -205,17 +205,12 @@ jobs:
       - name: Decompress Bin Folder
         if: env.GENERATE_STATUS == 'success'
         run: |
-          sudo apt update && sudo apt install tree -y
           cd openwrt
-          tree .
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
           cd output
-          tree .
           zip -s 0 bin-archive.zip --out ../bin.zip
           cd ..
-          tree .
           unzip bin.zip
-          tree .
 
       - name: Rclone Upload
         env:
@@ -224,6 +219,11 @@ jobs:
         if: env.GENERATE_STATUS == 'success' && env.UPLOAD_RCLONE == 'true' && env.RCLONE_PACKAGE != ''
         run: |
           cd $OPENWRTROOT
+          curl https://rclone.org/install.sh | sudo bash
+          mkdir -p ~/.config/rclone/
+          cat << EOF > ~/.config/rclone/rclone.conf
+          ${{ secrets.RCLONE_CONFIG }}
+          EOF
           rclone copy bin/targets/$TARGET/$SUBTARGET $RCLONE_PACKAGE:archive/$DATE/targets/$TARGET/$SUBTARGET
           rclone copy bin/packages/$PLATFORM $RCLONE_PACKAGE:latest/packages/$PLATFORM-temp
           rclone copy $RCLONE_PACKAGE:archive/$DATE/targets/$TARGET/$SUBTARGET $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET-temp

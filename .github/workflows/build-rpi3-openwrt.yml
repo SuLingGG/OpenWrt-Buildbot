@@ -90,7 +90,7 @@ jobs:
         id: compile
         run: |
           cd $OPENWRTROOT
-          echo -e "$(nproc) thread compile"
+          echo -e "$(nproc) threads compile"
           make tools/compile -j$(nproc) || make tools/compile -j1 V=s
           make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
           make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
@@ -157,6 +157,7 @@ jobs:
         if: steps.generate.outputs.GENERATE_STATUS == 'success'
         run: |
           cd $OPENWRTROOT
+          echo -e "$(nproc) threads compile"
           make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
           make diffconfig
           make package/compile -j$(nproc) IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
@@ -191,7 +192,7 @@ jobs:
           echo "SUBTARGET=$(echo '${{needs.Build.outputs.SUBTARGET}}')" >> $GITHUB_ENV
           echo "GENERATE_STATUS=$(echo '${{needs.Build.outputs.GENERATE_STATUS}}')" >> $GITHUB_ENV
 
-      - name: Download Bin Folder
+      - name: Download Bin Archive
         uses: actions/download-artifact@v2
         if: env.GENERATE_STATUS == 'success'
         with:
@@ -204,7 +205,7 @@ jobs:
           cd openwrt
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
           cd output
-          zip -s 0 bin-archive.zip --out ../bin.zip
+          zip -q -s 0 bin-archive.zip --out ../bin.zip
           cd ..
           unzip bin.zip
 

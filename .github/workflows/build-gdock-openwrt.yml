@@ -18,7 +18,7 @@ on:
 #    types: started
 
 env:
-  REPO_URL: https://github.com/project-openwrt/openwrt
+  REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: openwrt-18.06-k5.4
   CONFIG_FILE: config/ipq40xx/gdock-openwrt-target.config
   DIY_SH: scripts/project-openwrt.sh

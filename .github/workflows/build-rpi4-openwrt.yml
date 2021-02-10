@@ -18,7 +18,7 @@ on:
 #    types: started
 
 env:
-  REPO_URL: https://github.com/immortalwrt/immortalwrt
+  REPO_URL: https://github.com/project-openwrt/openwrt
   REPO_BRANCH: openwrt-18.06-k5.4
   CONFIG_FILE: config/bcm27xx/rpi4-openwrt-target.config
   DIY_SH: scripts/project-openwrt.sh
@@ -70,7 +70,7 @@ jobs:
         run: |
           [ -e files ] && mv files $OPENWRTROOT/files
           cp $CONFIG_FILE $OPENWRTROOT/.config
-          cat config/firmware-extra.config >> $OPENWRTROOT/.config
+          cat config/packages-extra.config >> $OPENWRTROOT/.config
           chmod +x scripts/*.sh
           cd $OPENWRTROOT
           ../$DIY_SH
@@ -86,7 +86,7 @@ jobs:
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
-      - name: Compile Packages & Firmware
+      - name: Compile Extra Packages
         id: compile
         run: |
           cd $OPENWRTROOT
@@ -113,6 +113,38 @@ jobs:
           echo "::set-output name=FIRMWARE::$(echo $PWD)"
           echo "::set-output name=COMPILE_STATUS::success"
 
+      - name: Deploy Extra Packages
+        if: steps.compile.outputs.COMPILE_STATUS == 'success'
+        run: |
+          mkdir -p /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/packages
+          mkdir -p /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/targets/$TARGET
+          mkdir -p /data/www/openwrt.cc/snapshots/packages
+          mkdir -p /data/www/openwrt.cc/snapshots/targets/$TARGET
+          cd $OPENWRTROOT
+          cp -r bin/packages/$PLATFORM /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/packages
+          cp -r bin/targets/$TARGET/$SUBTARGET /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/targets/$TARGET
+          rm -rf /data/www/openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET
+          rm -rf /data/www/openwrt.cc/snapshots/packages/$PLATFORM
+          cp -r bin/packages/$PLATFORM /data/www/openwrt.cc/snapshots/packages
+          cp -r bin/targets/$TARGET/$SUBTARGET /data/www/openwrt.cc/snapshots/$TARGET
+          cat $FIRMWARE/packages/Packages | grep "Depends: kernel" | head -n 1 | awk -F "-" '{print $3}' | sed 's/).*//g' > .vermagic
+          sed -i -e 's/^\(.\).*vermagic$/\1cp $(TOPDIR)\/.vermagic $(LINUX_DIR)\/.vermagic/' include/kernel-defaults.mk
+
+      - name: Compile Firmware Packages
+        if: steps.compile.outputs.COMPILE_STATUS == 'success'
+        run: |
+          cd $OPENWRTROOT
+          make clean
+          rm -f .config*
+          cp ../$CONFIG_FILE ./.config
+          cat ../config/firmware-extra.config >> $OPENWRTROOT/.config
+          make defconfig
+          echo -e "$(nproc) threads compile"
+          make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
+          make diffconfig
+          make package/compile -j$(nproc) IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
+          make package/index
+
       - name: Generate Firmware
         if: steps.compile.outputs.COMPILE_STATUS == 'success'
         id: generate
@@ -135,29 +167,26 @@ jobs:
           make package/install -j$(nproc) || make package/install -j1 V=s
           make target/install -j$(nproc) || make target/install -j1 V=s
           make checksum
+          echo "::set-output name=GENERATE_STATUS::success"
+
+      - name: Deploy Firmware
+        if: steps.generate.outputs.GENERATE_STATUS == 'success'
+        run: |
           cd $FIRMWARE
           mkdir -p $OPENWRTROOT/output
           mv `ls | grep -v "packages"` $OPENWRTROOT/output
-          echo "::set-output name=GENERATE_STATUS::success"
-
-      - name: Deploy Packages & Firmware
-        if: steps.generate.outputs.GENERATE_STATUS == 'success'
-        run: |
-          mkdir -p /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')
-          mkdir -p /data/www/openwrt.cc/snapshots/packages
-          mkdir -p /data/www/openwrt.cc/snapshots/targets/$TARGET
-          cd $OPENWRTROOT
-          cp -r bin/* /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')
-          rm -rf /data/www/openwrt.cc/snapshots/packages/$PLATFORM
-          rm -rf /data/www/openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET
-          cp -r bin/packages/$PLATFORM /data/www/openwrt.cc/snapshots/packages
-          cp -r bin/targets/$TARGET/$SUBTARGET /data/www/openwrt.cc/snapshots/$TARGET
+          cp -f $OPENWRTROOT/output/* /data/www/openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET
+          cp -f $OPENWRTROOT/output/* /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/targets/$TARGET/$SUBTARGET
 
       - name: Compress Bin Folder
         if: steps.generate.outputs.GENERATE_STATUS == 'success'
         run: |
           cd $OPENWRTROOT
-          mv -f output/* $FIRMWARE
+          rm -rf bin/targets/$TARGET/$SUBTARGET
+          rm -rf bin/packages/$PLATFORM
+          cp -r /data/www/openwrt.cc/snapshots/$TARGET/$SUBTARGET bin/targets/$TARGET
+          cp -r /data/www/openwrt.cc/snapshots/packages/$PLATFORM bin/packages
+          cp -f $OPENWRTROOT/output/* bin/targets/$TARGET/$SUBTARGET
           zip -q -s 200m -r output/bin-archive.zip bin
 
       - name: Upload Bin Archive

@@ -18,7 +18,7 @@ on:
 #    types: started
 
 env:
-  REPO_URL: https://github.com/immortalwrt/immortalwrt
+  REPO_URL: https://github.com/project-openwrt/openwrt
   REPO_BRANCH: openwrt-18.06-k5.4
   CONFIG_FILE: config/ipq40xx/gdock-openwrt-target.config
   DIY_SH: scripts/project-openwrt.sh
@@ -70,7 +70,7 @@ jobs:
         run: |
           [ -e files ] && mv files $OPENWRTROOT/files
           cp $CONFIG_FILE $OPENWRTROOT/.config
-          cat config/firmware-kmod.config >> $OPENWRTROOT/.config
+          echo "CONFIG_ALL_KMODS=y" >> $OPENWRTROOT/.config
           chmod +x scripts/*.sh
           cd $OPENWRTROOT
           ../$DIY_SH
@@ -86,7 +86,7 @@ jobs:
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
-      - name: Compile Packages & Firmware
+      - name: Compile Firmware Packages
         id: compile
         run: |
           cd $OPENWRTROOT
@@ -140,10 +140,13 @@ jobs:
         if: steps.generate.outputs.GENERATE_STATUS == 'success'
         run: |
           mkdir -p /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')
+          mkdir -p /data/www/openwrt.cc/snapshots/packages
           mkdir -p /data/www/openwrt.cc/snapshots/targets/$TARGET
           cd $OPENWRTROOT
           cp -r bin/* /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')
+          rm -rf /data/www/openwrt.cc/snapshots/packages/$PLATFORM
           rm -rf /data/www/openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET
+          cp -r bin/packages/$PLATFORM /data/www/openwrt.cc/snapshots/packages
           cp -r bin/targets/$TARGET/$SUBTARGET /data/www/openwrt.cc/snapshots/$TARGET
 
       - name: Compress Bin Folder
@@ -190,6 +193,24 @@ jobs:
           zip -q -s 0 bin-archive.zip --out ../bin.zip
           cd ..
           unzip bin.zip
+
+      - name: Rclone Upload
+        env:
+          RCLONE_PACKAGE: ${{ secrets.RCLONE_PACKAGE }}
+          RCLONE_FIRMWARE: ${{ secrets.RCLONE_FIRMWARE }}
+        if: env.GENERATE_STATUS == 'success' && env.UPLOAD_RCLONE == 'true' && env.RCLONE_PACKAGE != ''
+        run: |
+          cd $OPENWRTROOT
+          curl https://rclone.org/install.sh | sudo bash
+          mkdir -p ~/.config/rclone/
+          cat << EOF > ~/.config/rclone/rclone.conf
+          ${{ secrets.RCLONE_CONFIG }}
+          EOF
+          rclone copy bin/targets/$TARGET/$SUBTARGET $RCLONE_PACKAGE:archive/$(date +'%Y-%m-%d')/targets/$TARGET/$SUBTARGET
+          rclone copy $RCLONE_PACKAGE:archive/$(date +'%Y-%m-%d')/targets/$TARGET/$SUBTARGET $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET-temp
+          rclone purge $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET > /dev/null 2>&1 || true
+          rclone moveto $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET-temp $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET
+          echo "::warning file=Download-Link::https://openwrt.cc/snapshots/latest/targets/$TARGET/$SUBTARGET"
 
       - name: Organize Files
         id: organize

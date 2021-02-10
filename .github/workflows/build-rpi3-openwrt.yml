@@ -18,7 +18,7 @@ on:
 #    types: started
 
 env:
-  REPO_URL: https://github.com/immortalwrt/immortalwrt
+  REPO_URL: https://github.com/project-openwrt/openwrt
   REPO_BRANCH: openwrt-18.06-k5.4
   CONFIG_FILE: config/bcm27xx/rpi3-openwrt-target.config
   DIY_SH: scripts/project-openwrt.sh
@@ -70,7 +70,7 @@ jobs:
         run: |
           [ -e files ] && mv files $OPENWRTROOT/files
           cp $CONFIG_FILE $OPENWRTROOT/.config
-          cat config/firmware-extra.config >> $OPENWRTROOT/.config
+          cat config/packages-extra.config >> $OPENWRTROOT/.config
           chmod +x scripts/*.sh
           cd $OPENWRTROOT
           ../$DIY_SH
@@ -86,7 +86,7 @@ jobs:
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
-      - name: Compile Packages & Firmware
+      - name: Compile Firmware Packages
         id: compile
         run: |
           cd $OPENWRTROOT
@@ -139,6 +139,29 @@ jobs:
           mkdir -p $OPENWRTROOT/output
           mv `ls | grep -v "packages"` $OPENWRTROOT/output
           echo "::set-output name=GENERATE_STATUS::success"
+
+      - name: Download Extra Packages
+        if: steps.generate.outputs.GENERATE_STATUS == 'success'
+        run: |
+          cd $OPENWRTROOT
+          make clean
+          rm -f .config*
+          cp ../$CONFIG_FILE ./.config
+          cat ../config/packages-extra.config >> $OPENWRTROOT/.config
+          make defconfig
+          make download -j$(nproc)
+          find dl -size -1024c -exec ls -l {} \;
+          find dl -size -1024c -exec rm -f {} \;
+
+      - name: Compile Extra Packages
+        if: steps.generate.outputs.GENERATE_STATUS == 'success'
+        run: |
+          cd $OPENWRTROOT
+          echo -e "$(nproc) threads compile"
+          make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
+          make diffconfig
+          make package/compile -j$(nproc) IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
+          make package/index
 
       - name: Deploy Packages & Firmware
         if: steps.generate.outputs.GENERATE_STATUS == 'success'
@@ -198,6 +221,27 @@ jobs:
           zip -q -s 0 bin-archive.zip --out ../bin.zip
           cd ..
           unzip bin.zip
+
+      - name: Rclone Upload
+        env:
+          RCLONE_PACKAGE: ${{ secrets.RCLONE_PACKAGE }}
+          RCLONE_FIRMWARE: ${{ secrets.RCLONE_FIRMWARE }}
+        if: env.GENERATE_STATUS == 'success' && env.UPLOAD_RCLONE == 'true' && env.RCLONE_PACKAGE != ''
+        run: |
+          cd $OPENWRTROOT
+          curl https://rclone.org/install.sh | sudo bash
+          mkdir -p ~/.config/rclone/
+          cat << EOF > ~/.config/rclone/rclone.conf
+          ${{ secrets.RCLONE_CONFIG }}
+          EOF
+          rclone copy bin/targets/$TARGET/$SUBTARGET $RCLONE_PACKAGE:archive/$(date +'%Y-%m-%d')/targets/$TARGET/$SUBTARGET
+          rclone copy bin/packages/$PLATFORM $RCLONE_PACKAGE:latest/packages/$PLATFORM-temp
+          rclone copy $RCLONE_PACKAGE:archive/$(date +'%Y-%m-%d')/targets/$TARGET/$SUBTARGET $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET-temp
+          rclone purge $RCLONE_PACKAGE:latest/packages/$PLATFORM > /dev/null 2>&1 || true
+          rclone purge $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET > /dev/null 2>&1 || true
+          rclone moveto $RCLONE_PACKAGE:latest/packages/$PLATFORM-temp $RCLONE_PACKAGE:latest/packages/$PLATFORM
+          rclone moveto $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET-temp $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET
+          echo "::warning file=Download-Link::https://openwrt.cc/snapshots/latest/targets/$TARGET/$SUBTARGET"
 
       - name: Organize Files
         id: organize

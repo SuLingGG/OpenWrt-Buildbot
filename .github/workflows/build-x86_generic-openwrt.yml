@@ -86,7 +86,7 @@ jobs:
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
-      - name: Compile Firmware Packages
+      - name: Compile Extra Packages
         id: compile
         run: |
           cd $OPENWRTROOT
@@ -113,6 +113,40 @@ jobs:
           echo "::set-output name=FIRMWARE::$(echo $PWD)"
           echo "::set-output name=COMPILE_STATUS::success"
 
+      - name: Deploy Extra Packages
+        if: steps.compile.outputs.COMPILE_STATUS == 'success'
+        run: |
+          mkdir -p /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/packages
+          mkdir -p /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/targets/$TARGET
+          mkdir -p /data/www/openwrt.cc/snapshots/packages
+          mkdir -p /data/www/openwrt.cc/snapshots/targets/$TARGET
+          cd $OPENWRTROOT
+          cp -r bin/packages/$PLATFORM /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/packages
+          cp -r bin/targets/$TARGET/$SUBTARGET /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/targets/$TARGET
+          rm -rf /data/www/openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET
+          rm -rf /data/www/openwrt.cc/snapshots/packages/$PLATFORM
+          cp -r bin/packages/$PLATFORM /data/www/openwrt.cc/snapshots/packages
+          cp -r bin/targets/$TARGET/$SUBTARGET /data/www/openwrt.cc/snapshots/targets/$TARGET
+          mkdir -p $OPENWRTROOT/output
+          cp -r bin $OPENWRTROOT/output
+          cat $FIRMWARE/packages/Packages | grep -m1 "Depends: kernel" | awk -F "-" '{print $3}' | sed 's/).*//g' > .vermagic
+          sed -i -e 's/^\(.\).*vermagic$/\1cp $(TOPDIR)\/.vermagic $(LINUX_DIR)\/.vermagic/' include/kernel-defaults.mk
+
+      - name: Compile Firmware Packages
+        if: steps.compile.outputs.COMPILE_STATUS == 'success'
+        run: |
+          cd $OPENWRTROOT
+          make clean
+          rm -f .config*
+          cp ../$CONFIG_FILE ./.config
+          cat ../config/firmware-extra.config >> $OPENWRTROOT/.config
+          make defconfig
+          echo -e "$(nproc) threads compile"
+          make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
+          make diffconfig
+          make package/compile -j$(nproc) IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
+          make package/index
+
       - name: Generate Firmware
         if: steps.compile.outputs.COMPILE_STATUS == 'success'
         id: generate
@@ -127,16 +161,11 @@ jobs:
           cp ../data/opkg/distfeeds.conf files/etc/opkg/distfeeds.conf
           mkdir -p files/etc/uci-defaults/
           cp ../scripts/init-settings.sh files/etc/uci-defaults/99-init-settings
-          chmod +x files/etc/uci-defaults/99-init-settings
           mkdir -p files/bin
           cp ../scripts/ipv6-helper.sh files/bin/ipv6-helper
-          chmod +x files/bin/ipv6-helper
           make package/install -j$(nproc) || make package/install -j1 V=s
           make target/install -j$(nproc) || make target/install -j1 V=s
           make checksum
-          cd $FIRMWARE
-          mkdir -p $OPENWRTROOT/output
-          mv `ls | grep -v "packages"` $OPENWRTROOT/output
           echo "::set-output name=GENERATE_STATUS::success"
 
       - name: Compress Img Files
@@ -144,48 +173,20 @@ jobs:
           cd ${FIRMWARE}
           gzip *.img
 
-      - name: Download Extra Packages
+      - name: Deploy Firmware
         if: steps.generate.outputs.GENERATE_STATUS == 'success'
         run: |
-          cd $OPENWRTROOT
-          make clean
-          rm -f .config*
-          cp ../$CONFIG_FILE ./.config
-          cat ../config/packages-extra.config >> $OPENWRTROOT/.config
-          make defconfig
-          make download -j$(nproc)
-          find dl -size -1024c -exec ls -l {} \;
-          find dl -size -1024c -exec rm -f {} \;
-
-      - name: Compile Extra Packages
-        if: steps.generate.outputs.GENERATE_STATUS == 'success'
-        run: |
-          cd $OPENWRTROOT
-          echo -e "$(nproc) threads compile"
-          make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
-          make diffconfig
-          make package/compile -j$(nproc) IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
-          make package/index
-
-      - name: Deploy Packages & Firmware
-        if: steps.generate.outputs.GENERATE_STATUS == 'success'
-        run: |
-          mkdir -p /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')
-          mkdir -p /data/www/openwrt.cc/snapshots/packages
-          mkdir -p /data/www/openwrt.cc/snapshots/targets/$TARGET
-          cd $OPENWRTROOT
-          cp -r bin/* /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')
-          rm -rf /data/www/openwrt.cc/snapshots/packages/$PLATFORM
-          rm -rf /data/www/openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET
-          cp -r bin/packages/$PLATFORM /data/www/openwrt.cc/snapshots/packages
-          cp -r bin/targets/$TARGET/$SUBTARGET /data/www/openwrt.cc/snapshots/$TARGET
+          cd $FIRMWARE
+          cp -f `ls | grep -v "packages"` $OPENWRTROOT/output/bin/targets/$TARGET/$SUBTARGET
+          cp -f `ls | grep -v "packages"` /data/www/openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET
+          cp -f `ls | grep -v "packages"` /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/targets/$TARGET/$SUBTARGET
 
       - name: Compress Bin Folder
         if: steps.generate.outputs.GENERATE_STATUS == 'success'
         run: |
-          cd $OPENWRTROOT
-          mv -f output/* $FIRMWARE
-          zip -q -s 200m -r output/bin-archive.zip bin
+          cd $OPENWRTROOT/output
+          zip -q -s 500m -r bin-archive.zip bin
+          rm -rf bin
 
       - name: Upload Bin Archive
         uses: actions/upload-artifact@main
@@ -214,38 +215,15 @@ jobs:
         if: env.GENERATE_STATUS == 'success'
         with:
           name: bin-archive
-          path: openwrt/output
+          path: openwrt
 
       - name: Decompress Bin Folder
         if: env.GENERATE_STATUS == 'success'
         run: |
           cd openwrt
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
-          cd output
-          zip -q -s 0 bin-archive.zip --out ../bin.zip
-          cd ..
+          zip -q -s 0 bin-archive.zip --out bin.zip
           unzip bin.zip
-
-      - name: Rclone Upload
-        env:
-          RCLONE_PACKAGE: ${{ secrets.RCLONE_PACKAGE }}
-          RCLONE_FIRMWARE: ${{ secrets.RCLONE_FIRMWARE }}
-        if: env.GENERATE_STATUS == 'success' && env.UPLOAD_RCLONE == 'true' && env.RCLONE_PACKAGE != ''
-        run: |
-          cd $OPENWRTROOT
-          curl https://rclone.org/install.sh | sudo bash
-          mkdir -p ~/.config/rclone/
-          cat << EOF > ~/.config/rclone/rclone.conf
-          ${{ secrets.RCLONE_CONFIG }}
-          EOF
-          rclone copy bin/targets/$TARGET/$SUBTARGET $RCLONE_PACKAGE:archive/$(date +'%Y-%m-%d')/targets/$TARGET/$SUBTARGET
-          rclone copy bin/packages/$PLATFORM $RCLONE_PACKAGE:latest/packages/$PLATFORM-temp
-          rclone copy $RCLONE_PACKAGE:archive/$(date +'%Y-%m-%d')/targets/$TARGET/$SUBTARGET $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET-temp
-          rclone purge $RCLONE_PACKAGE:latest/packages/$PLATFORM > /dev/null 2>&1 || true
-          rclone purge $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET > /dev/null 2>&1 || true
-          rclone moveto $RCLONE_PACKAGE:latest/packages/$PLATFORM-temp $RCLONE_PACKAGE:latest/packages/$PLATFORM
-          rclone moveto $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET-temp $RCLONE_PACKAGE:latest/targets/$TARGET/$SUBTARGET
-          echo "::warning file=Download-Link::https://openwrt.cc/snapshots/latest/targets/$TARGET/$SUBTARGET"
 
       - name: Organize Files
         id: organize

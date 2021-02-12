@@ -162,10 +162,8 @@ jobs:
           echo "dtparam=i2c_arm=on,audio=on" >> target/linux/bcm27xx/image/config.txt
           mkdir -p files/etc/uci-defaults/
           cp ../scripts/init-settings.sh files/etc/uci-defaults/99-init-settings
-          chmod +x files/etc/uci-defaults/99-init-settings
           mkdir -p files/bin
           cp ../scripts/ipv6-helper.sh files/bin/ipv6-helper
-          chmod +x files/bin/ipv6-helper
           make package/install -j$(nproc) || make package/install -j1 V=s
           make target/install -j$(nproc) || make target/install -j1 V=s
           make checksum
@@ -175,9 +173,9 @@ jobs:
         if: steps.generate.outputs.GENERATE_STATUS == 'success'
         run: |
           cd $FIRMWARE
-          cp `ls | grep -v "packages"` $OPENWRTROOT/output/bin/targets/$TARGET/$SUBTARGET
-          cp `ls | grep -v "packages"` /data/www/openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET
-          cp `ls | grep -v "packages"` /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/targets/$TARGET/$SUBTARGET
+          cp -f `ls | grep -v "packages"` $OPENWRTROOT/output/bin/targets/$TARGET/$SUBTARGET
+          cp -f `ls | grep -v "packages"` /data/www/openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET
+          cp -f `ls | grep -v "packages"` /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/targets/$TARGET/$SUBTARGET
 
       - name: Compress Bin Folder
         if: steps.generate.outputs.GENERATE_STATUS == 'success'

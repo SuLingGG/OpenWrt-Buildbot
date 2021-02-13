@@ -171,7 +171,7 @@ jobs:
           rm -rf /data/www/openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET
           cp -r $FIRMWARE /data/www/openwrt.cc/snapshots/targets/$TARGET
           mkdir -p $OPENWRTROOT/output/bin/targets/$TARGET
-          cp -r $FIRMWARE $OPENWRTROOT/output/bin/targets/$TARGET/$SUBTARGET
+          cp -r $FIRMWARE $OPENWRTROOT/output/bin/targets/$TARGET
 
       - name: Compress Bin Folder
         if: steps.generate.outputs.GENERATE_STATUS == 'success'

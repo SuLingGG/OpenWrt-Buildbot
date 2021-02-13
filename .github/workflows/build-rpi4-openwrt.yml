@@ -122,8 +122,8 @@ jobs:
           cp -r bin/packages/$PLATFORM /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/packages
           rm -rf /data/www/openwrt.cc/snapshots/packages/$PLATFORM
           cp -r bin/packages/$PLATFORM /data/www/openwrt.cc/snapshots/packages
-          mkdir -p $OPENWRTROOT/output/packages
-          cp -r bin/packages/$PLATFORM $OPENWRTROOT/output/packages
+          mkdir -p $OPENWRTROOT/output/bin/packages
+          cp -r bin/packages/$PLATFORM $OPENWRTROOT/output/bin/packages
 
       - name: Compile Firmware Packages
         if: steps.compile.outputs.COMPILE_STATUS == 'success'
@@ -170,7 +170,7 @@ jobs:
           cp -r $FIRMWARE /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/targets/$TARGET
           rm -rf /data/www/openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET
           cp -r $FIRMWARE /data/www/openwrt.cc/snapshots/targets/$TARGET
-          mkdir -p $OPENWRTROOT/output/targets/$TARGET
+          mkdir -p $OPENWRTROOT/output/bin/targets/$TARGET
           cp -r $FIRMWARE $OPENWRTROOT/output/bin/targets/$TARGET/$SUBTARGET
 
       - name: Compress Bin Folder

@@ -135,11 +135,7 @@ jobs:
           cp ../$CONFIG_FILE ./.config
           cat ../config/firmware-extra.config >> $OPENWRTROOT/.config
           make defconfig
-          echo -e "$(nproc) threads compile"
-          make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
           make diffconfig
-          make package/compile -j$(nproc) IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
-          make package/index
 
       - name: Generate Firmware
         if: steps.compile.outputs.COMPILE_STATUS == 'success'

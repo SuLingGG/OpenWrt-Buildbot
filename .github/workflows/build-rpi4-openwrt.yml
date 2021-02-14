@@ -124,12 +124,13 @@ jobs:
           cp -r bin/packages/$PLATFORM /data/www/openwrt.cc/snapshots/packages
           mkdir -p $OPENWRTROOT/output/bin/packages
           cp -r bin/packages/$PLATFORM $OPENWRTROOT/output/bin/packages
+          cat $FIRMWARE/packages/Packages | grep -m1 "Depends: kernel" | awk -F "-" '{print $3}' | sed 's/).*//g' > .vermagic
+          sed -i -e 's/^\(.\).*vermagic$/\1cp $(TOPDIR)\/.vermagic $(LINUX_DIR)\/.vermagic/' include/kernel-defaults.mk
 
       - name: Compile Firmware Packages
         if: steps.compile.outputs.COMPILE_STATUS == 'success'
         run: |
           cd $OPENWRTROOT
-          make clean
           rm -f .config*
           cp ../$CONFIG_FILE ./.config
           cat ../config/firmware-extra.config >> $OPENWRTROOT/.config

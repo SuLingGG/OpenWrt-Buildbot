@@ -70,7 +70,7 @@ jobs:
         run: |
           [ -e files ] && mv files $OPENWRTROOT/files
           cp $CONFIG_FILE $OPENWRTROOT/.config
-          cat config/packages-extra.config >> $OPENWRTROOT/.config
+          cat config/firmware-extra.config >> $OPENWRTROOT/.config
           chmod +x scripts/*.sh
           cd $OPENWRTROOT
           ../$DIY_SH
@@ -86,7 +86,7 @@ jobs:
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
-      - name: Compile Extra Packages
+      - name: Compile Firmware Packages
         id: compile
         run: |
           cd $OPENWRTROOT
@@ -154,13 +154,13 @@ jobs:
           cd $OPENWRTROOT
           rm -f .config*
           cp ../$CONFIG_FILE ./.config
-          cat ../config/firmware-extra.config >> $OPENWRTROOT/.config
+          cat ../config/packages-extra.config >> $OPENWRTROOT/.config
           make defconfig
           make download -j$(nproc)
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
-      - name: Compile Firmware Packages
+      - name: Compile Extra Packages
         if: steps.generate.outputs.COMPILE_STATUS == 'success'
         run: |
           cd $OPENWRTROOT

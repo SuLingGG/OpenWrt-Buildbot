@@ -149,7 +149,7 @@ jobs:
           cp -r $FIRMWARE $OPENWRTROOT/output/bin/targets/$TARGET
 
       - name: Download Extra Packages
-        if: steps.generate.outputs.COMPILE_STATUS == 'success'
+        if: steps.generate.outputs.GENERATE_STATUS == 'success'
         run: |
           cd $OPENWRTROOT
           rm -f .config*
@@ -161,7 +161,7 @@ jobs:
           find dl -size -1024c -exec rm -f {} \;
 
       - name: Compile Extra Packages
-        if: steps.generate.outputs.COMPILE_STATUS == 'success'
+        if: steps.generate.outputs.GENERATE_STATUS == 'success'
         run: |
           cd $OPENWRTROOT
           make diffconfig
@@ -169,7 +169,7 @@ jobs:
           make package/index
 
       - name: Deploy Extra Packages
-        if: steps.generate.outputs.COMPILE_STATUS == 'success'
+        if: steps.generate.outputs.GENERATE_STATUS == 'success'
         run: |
           mkdir -p /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/packages
           mkdir -p /data/www/openwrt.cc/snapshots/packages

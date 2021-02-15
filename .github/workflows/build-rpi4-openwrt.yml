@@ -95,7 +95,7 @@ jobs:
           make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
           make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
           make diffconfig
-          make package/compile -j$(nproc) IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
+          make package/compile -j$(nproc) IGNORE_ERRORS="y m" || make package/compile -j1 V=s IGNORE_ERRORS="y m"
           make package/index
           cd $OPENWRTROOT/bin/packages/*
           PLATFORM=$(basename `pwd`)
@@ -112,30 +112,6 @@ jobs:
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
           echo "::set-output name=FIRMWARE::$(echo $PWD)"
           echo "::set-output name=COMPILE_STATUS::success"
-
-      - name: Deploy Extra Packages
-        if: steps.compile.outputs.COMPILE_STATUS == 'success'
-        run: |
-          mkdir -p /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/packages
-          mkdir -p /data/www/openwrt.cc/snapshots/packages
-          cd $OPENWRTROOT
-          cp -r bin/packages/$PLATFORM /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/packages
-          rm -rf /data/www/openwrt.cc/snapshots/packages/$PLATFORM
-          cp -r bin/packages/$PLATFORM /data/www/openwrt.cc/snapshots/packages
-          mkdir -p $OPENWRTROOT/output/bin/packages
-          cp -r bin/packages/$PLATFORM $OPENWRTROOT/output/bin/packages
-          cat $FIRMWARE/packages/Packages | grep -m1 "Depends: kernel" | awk -F "-" '{print $3}' | sed 's/).*//g' > .vermagic
-          sed -i -e 's/^\(.\).*vermagic$/\1cp $(TOPDIR)\/.vermagic $(LINUX_DIR)\/.vermagic/' include/kernel-defaults.mk
-
-      - name: Compile Firmware Packages
-        if: steps.compile.outputs.COMPILE_STATUS == 'success'
-        run: |
-          cd $OPENWRTROOT
-          rm -f .config*
-          cp ../$CONFIG_FILE ./.config
-          cat ../config/firmware-extra.config >> $OPENWRTROOT/.config
-          make defconfig
-          make diffconfig
 
       - name: Generate Firmware
         if: steps.compile.outputs.COMPILE_STATUS == 'success'
@@ -157,6 +133,8 @@ jobs:
           make package/install -j$(nproc) || make package/install -j1 V=s
           make target/install -j$(nproc) || make target/install -j1 V=s
           make checksum
+          cat $FIRMWARE/packages/Packages | grep -m1 "Depends: kernel" | awk -F "-" '{print $3}' | sed 's/).*//g' > .vermagic
+          sed -i -e 's/^\(.\).*vermagic$/\1cp $(TOPDIR)\/.vermagic $(LINUX_DIR)\/.vermagic/' include/kernel-defaults.mk
           echo "::set-output name=GENERATE_STATUS::success"
 
       - name: Deploy Firmware & Kmods
@@ -169,6 +147,38 @@ jobs:
           cp -r $FIRMWARE /data/www/openwrt.cc/snapshots/targets/$TARGET
           mkdir -p $OPENWRTROOT/output/bin/targets/$TARGET
           cp -r $FIRMWARE $OPENWRTROOT/output/bin/targets/$TARGET
+
+      - name: Download Extra Packages
+        if: steps.generate.outputs.COMPILE_STATUS == 'success'
+        run: |
+          cd $OPENWRTROOT
+          rm -f .config*
+          cp ../$CONFIG_FILE ./.config
+          cat ../config/firmware-extra.config >> $OPENWRTROOT/.config
+          make defconfig
+          make download -j$(nproc)
+          find dl -size -1024c -exec ls -l {} \;
+          find dl -size -1024c -exec rm -f {} \;
+
+      - name: Compile Firmware Packages
+        if: steps.generate.outputs.COMPILE_STATUS == 'success'
+        run: |
+          cd $OPENWRTROOT
+          make diffconfig
+          make package/compile -j$(nproc) IGNORE_ERRORS="y m" || make package/compile -j1 V=s IGNORE_ERRORS="y m"
+          make package/index
+
+      - name: Deploy Extra Packages
+        if: steps.generate.outputs.COMPILE_STATUS == 'success'
+        run: |
+          mkdir -p /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/packages
+          mkdir -p /data/www/openwrt.cc/snapshots/packages
+          cd $OPENWRTROOT
+          cp -r bin/packages/$PLATFORM /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/packages
+          rm -rf /data/www/openwrt.cc/snapshots/packages/$PLATFORM
+          cp -r bin/packages/$PLATFORM /data/www/openwrt.cc/snapshots/packages
+          mkdir -p $OPENWRTROOT/output/bin/packages
+          cp -r bin/packages/$PLATFORM $OPENWRTROOT/output/bin/packages
 
       - name: Compress Bin Folder
         if: steps.generate.outputs.GENERATE_STATUS == 'success'

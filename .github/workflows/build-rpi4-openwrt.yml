@@ -133,8 +133,6 @@ jobs:
           make package/install -j$(nproc) || make package/install -j1 V=s
           make target/install -j$(nproc) || make target/install -j1 V=s
           make checksum
-          cat $FIRMWARE/packages/Packages | grep -m1 "Depends: kernel" | awk -F "-" '{print $3}' | sed 's/).*//g' > .vermagic
-          sed -i -e 's/^\(.\).*vermagic$/\1cp $(TOPDIR)\/.vermagic $(LINUX_DIR)\/.vermagic/' include/kernel-defaults.mk
           echo "::set-output name=GENERATE_STATUS::success"
 
       - name: Deploy Firmware & Kmods

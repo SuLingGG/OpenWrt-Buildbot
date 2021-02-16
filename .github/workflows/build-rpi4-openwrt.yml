@@ -77,11 +77,12 @@ jobs:
           ../scripts/preset-clash-core.sh armv8
           ../scripts/preset-terminal-tools.sh
 
-      - name: Download Firmware Packages
+      - name: Download All Packages
         id: package
         run: |
           cd $OPENWRTROOT
           make defconfig
+          echo -e "$(nproc) threads download"
           make download -j$(nproc)
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
@@ -90,6 +91,11 @@ jobs:
         id: compile
         run: |
           cd $OPENWRTROOT
+          rm -f .config*
+          cp $CONFIG_FILE $OPENWRTROOT/.config
+          cat config/firmware-extra.config >> $OPENWRTROOT/.config
+          sed -i '/CONFIG_ALL=y/d' .config
+          make defconfig
           echo -e "$(nproc) threads compile"
           make tools/compile -j$(nproc) || make tools/compile -j1 V=s
           make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
@@ -146,7 +152,7 @@ jobs:
           mkdir -p $OPENWRTROOT/output/bin/targets/$TARGET
           cp -r $FIRMWARE $OPENWRTROOT/output/bin/targets/$TARGET
 
-      - name: Download Extra Packages
+      - name: Compile Extra Packages
         if: steps.generate.outputs.GENERATE_STATUS == 'success'
         run: |
           cd $OPENWRTROOT
@@ -154,14 +160,6 @@ jobs:
           cp ../$CONFIG_FILE ./.config
           cat ../config/packages-extra.config >> $OPENWRTROOT/.config
           make defconfig
-          make download -j$(nproc)
-          find dl -size -1024c -exec ls -l {} \;
-          find dl -size -1024c -exec rm -f {} \;
-
-      - name: Compile Extra Packages
-        if: steps.generate.outputs.GENERATE_STATUS == 'success'
-        run: |
-          cd $OPENWRTROOT
           make diffconfig
           make package/compile -j$(nproc) IGNORE_ERRORS="y m" || make package/compile -j1 V=s IGNORE_ERRORS="y m"
           make package/index

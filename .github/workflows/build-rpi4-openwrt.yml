@@ -141,9 +141,10 @@ jobs:
           make checksum
           echo "::set-output name=GENERATE_STATUS::success"
 
-      - name: Deploy Firmware & Kmods
+      - name: Deploy Firmware & Nonshared Packages
         if: steps.generate.outputs.GENERATE_STATUS == 'success'
         run: |
+          rm -rf /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')
           mkdir -p /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/targets/$TARGET
           mkdir -p /data/www/openwrt.cc/snapshots/targets/$TARGET
           cp -r $FIRMWARE /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/targets/$TARGET

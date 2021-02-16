@@ -81,6 +81,7 @@ jobs:
         id: package
         run: |
           cd $OPENWRTROOT
+          echo "CONFIG_ALL=y" >> .config
           make defconfig
           echo -e "$(nproc) threads download"
           make download -j$(nproc)
@@ -90,11 +91,10 @@ jobs:
       - name: Compile Firmware Packages
         id: compile
         run: |
-          cd $OPENWRTROOT
-          rm -f .config*
+          rm -f $OPENWRTROOT/.config*
           cp $CONFIG_FILE $OPENWRTROOT/.config
           cat config/firmware-extra.config >> $OPENWRTROOT/.config
-          sed -i '/CONFIG_ALL=y/d' .config
+          cd $OPENWRTROOT
           make defconfig
           echo -e "$(nproc) threads compile"
           make tools/compile -j$(nproc) || make tools/compile -j1 V=s

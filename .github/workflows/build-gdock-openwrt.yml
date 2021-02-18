@@ -13,7 +13,7 @@ on:
     types: [project, gdock]
   workflow_dispatch:
   schedule:
-    - cron: 0 18 * * *
+    - cron: 0 18 * * 2,4,6
 #  watch:
 #    types: started
 
@@ -147,6 +147,7 @@ jobs:
           cp -r bin/targets/$TARGET/$SUBTARGET /data/www/openwrt.cc/snapshots/targets/$TARGET
           mkdir -p $OPENWRTROOT/output
           cp -r bin $OPENWRTROOT/output
+          echo "::warning file=Firmware-OpenWrt.cc::Download Link: http://openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET"
 
       - name: Compress Bin Folder
         if: steps.generate.outputs.GENERATE_STATUS == 'success'

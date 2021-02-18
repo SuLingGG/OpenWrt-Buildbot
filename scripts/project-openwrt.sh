@@ -12,8 +12,6 @@
 pushd package/lean/default-settings/files
 sed -i '/http/d' zzz-default-settings
 sed -i '/openwrt_luci/d' zzz-default-settings
-export orig_version="$(cat "zzz-default-settings" | grep DISTRIB_REVISION= | awk -F "'" '{print $2}')"
-sed -i "s/${orig_version}/${orig_version} ($(date +"%Y-%m-%d"))/g" zzz-default-settings
 popd
 
 # Fix mt76 wireless driver
@@ -25,6 +23,11 @@ popd
 git clone https://github.com/openwrt-dev/po2lmo.git
 pushd po2lmo
 make && sudo make install
+popd
+
+# Rename hostname to OpenWrt
+pushd package/base-files/files/bin
+sed -i 's/ImmortalWrt/OpenWrt/g' config_generate
 popd
 
 # Change default shell to zsh

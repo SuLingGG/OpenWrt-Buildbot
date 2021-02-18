@@ -12,8 +12,8 @@ on:
   repository_dispatch:
     types: [project, gdock]
   workflow_dispatch:
-#  schedule:
-#    - cron: 0 18 * * *
+  schedule:
+    - cron: 0 18 * * *
 #  watch:
 #    types: started
 
@@ -71,23 +71,23 @@ jobs:
           [ -e files ] && mv files $OPENWRTROOT/files
           cp $CONFIG_FILE $OPENWRTROOT/.config
           cat config/firmware-extra.config >> $OPENWRTROOT/.config
-          echo "CONFIG_ALL_KMODS=y" >> $OPENWRTROOT/.config
           chmod +x scripts/*.sh
           cd $OPENWRTROOT
           ../$DIY_SH
           ../scripts/preset-clash-core.sh armv7
           ../scripts/preset-terminal-tools.sh
 
-      - name: Download Firmware Packages
+      - name: Download All Packages
         id: package
         run: |
           cd $OPENWRTROOT
           make defconfig
+          echo -e "$(nproc) threads download"
           make download -j$(nproc)
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
-      - name: Compile Extra Packages
+      - name: Compile Firmware Packages
         id: compile
         run: |
           cd $OPENWRTROOT
@@ -96,7 +96,7 @@ jobs:
           make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
           make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
           make diffconfig
-          make package/compile -j$(nproc) IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
+          make package/compile -j$(nproc) IGNORE_ERRORS="y m" || make package/compile -j1 V=s IGNORE_ERRORS="y m"
           make package/index
           cd $OPENWRTROOT/bin/packages/*
           PLATFORM=$(basename `pwd`)
@@ -135,9 +135,10 @@ jobs:
           make checksum
           echo "::set-output name=GENERATE_STATUS::success"
 
-      - name: Deploy Extra Packages
-        if: steps.compile.outputs.COMPILE_STATUS == 'success'
+      - name: Deploy Firmware & Nonshared Packages
+        if: steps.generate.outputs.GENERATE_STATUS == 'success'
         run: |
+          rm -rf /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')
           mkdir -p /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/targets/$TARGET
           mkdir -p /data/www/openwrt.cc/snapshots/targets/$TARGET
           cd $OPENWRTROOT

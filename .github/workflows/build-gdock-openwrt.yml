@@ -138,7 +138,7 @@ jobs:
       - name: Deploy Firmware & Nonshared Packages
         if: steps.generate.outputs.GENERATE_STATUS == 'success'
         run: |
-          rm -rf /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')
+          rm -rf /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/targets/$TARGET/$SUBTARGET
           mkdir -p /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/targets/$TARGET
           mkdir -p /data/www/openwrt.cc/snapshots/targets/$TARGET
           cd $OPENWRTROOT

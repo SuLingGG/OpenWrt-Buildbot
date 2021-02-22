@@ -183,13 +183,6 @@ jobs:
           cp -r bin/packages/$PLATFORM $OPENWRTROOT/output/bin/packages
           echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET"
 
-      - name: Compress Bin Folder
-        if: steps.generate.outputs.GENERATE_STATUS == 'success'
-        run: |
-          cd $OPENWRTROOT/output
-          zip -q -s 500m -r bin-archive.zip bin
-          rm -rf bin
-
       - name: Upload Bin Archive
         uses: actions/upload-artifact@main
         if: steps.generate.outputs.GENERATE_STATUS == 'success'

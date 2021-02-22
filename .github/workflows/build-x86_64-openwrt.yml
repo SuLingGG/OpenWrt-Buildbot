@@ -140,11 +140,6 @@ jobs:
           make checksum
           echo "::set-output name=GENERATE_STATUS::success"
 
-      - name: Compress Img Files
-        run: |
-          cd $FIRMWARE
-          gzip *.img
-
       - name: Deploy Firmware & Nonshared Packages
         if: steps.generate.outputs.GENERATE_STATUS == 'success'
         run: |

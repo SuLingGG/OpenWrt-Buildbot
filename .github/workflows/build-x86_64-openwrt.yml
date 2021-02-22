@@ -142,7 +142,7 @@ jobs:
 
       - name: Compress Img Files
         run: |
-          cd ${FIRMWARE}
+          cd $FIRMWARE
           gzip *.img
 
       - name: Deploy Firmware & Nonshared Packages

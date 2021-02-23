@@ -9,10 +9,10 @@
 - 比较全面的 IPV6 支持，固件内置 IPV6 CLI 配置工具 `ipv6-helper`，可快速安装 / 卸载 / 配置 IPV6。
 - 自建软件源提供 7000 余个软件包以及 189 个 LuCI APP (截止 2021-02-22)，并保证固件与自建软件源完全兼容。
 - 隔天更新固件与自建源中所有软件包，确保获得最新体验。
-- Clone 或者 Fork 本项目是没有意义的，本项目需要高性能的硬件设备做支撑，Github Action 提供的 Runner 在被限定的时间 (6小时) 内无法完成本项目繁重的编译任务。
 - 本项目适合具有 OpenWrt 丰富使用经验的 **进阶用户** 使用，因为自建软件源及开放软件包安装将导致诸多不确定因素，故在固件使用过程中遇到的问题请首先擅用搜索引擎来解决。对于固件使用中出现的问题本项目仅提供 **极其有限** 的支持。
 - 如果你没有多少使用 OpenWrt 的经验，请移步姊妹项目: [OpenWrt-Rpi](https://github.com/SuLingGG/OpenWrt-Rpi) 。
 - OpenWrt-Rpi 的大多数使用文档也适用于本项目，文档详情请移步 [OpenWrt-Rpi](https://github.com/SuLingGG/OpenWrt-Rpi) 项目的 [README.md](https://github.com/SuLingGG/OpenWrt-Rpi/blob/main/README.md) 页面。
+- 如果你想捐助此项目，请移步: [FUNDING.md](https://github.com/SuLingGG/OpenWrt-Mini/blob/main/FUNDING.md)。
 
 ## 设备支持情况
 

@@ -6,7 +6,7 @@
 - 项目使用 Self-Hosted Runner 作为 OpenWrt 编译设备，不受 Github Action 提供的 Runner 的硬件和软件限制。
 - 提供 40M 左右的 “纯净固件” 并预配置自建软件源，可使用 `opkg` 命令或前往 “系统 - 软件包” 中安装自己需要的软件包。
 - 固件集成常用驱动与 USB 无线网卡驱动，固件预置最新版 Clash 核心、预置 oh-my-zsh 以最大程度减少配置成本。
-- 比较全面的 IPV6 支持，固件内置 IPV6 CLI 配置工具，可快速安装 / 卸载 / 配置 IPV6。
+- 比较全面的 IPV6 支持，固件内置 IPV6 CLI 配置工具 `ipv6-helper`，可快速安装 / 卸载 / 配置 IPV6。
 - 自建软件源提供 7000 余个软件包以及 189 个 LuCI APP (截止 2021-02-22)，并保证固件与自建软件源完全兼容。
 - 隔天更新固件与自建源中所有软件包，确保获得最新体验。
 - Clone 或者 Fork 本项目是没有意义的，本项目需要高性能的硬件设备做支撑，Github Action 提供的 Runner 在被限定的时间 (6小时) 内无法完成本项目繁重的编译任务。
@@ -16,16 +16,15 @@
 
 ## 设备支持情况
 
-|   支持设备/版本    |                          编译结果页                          |         Platform         |  Target  | Subtarget |
-| :----------------: | :----------------------------------------------------------: | :----------------------: | :------: | :-------: |
-|       竞斗云       | [✅](https://github.com/SuLingGG/OpenWrt-Mini/actions/workflows/build-gdock-openwrt.yml?query=is%3Asuccess) | arm_cortex-a7_neon-vfpv4 | ipq40xx  |  generic  |
-|     树莓派 1B      | [✅](https://github.com/SuLingGG/OpenWrt-Mini/actions/workflows/build-rpi1-openwrt.yml?query=is%3Asuccess) |   arm_arm1176jzf-s_vfp   | bcm27xx  |  bcm2708  |
-|     树莓派 2B      | [✅](https://github.com/SuLingGG/OpenWrt-Mini/actions/workflows/build-rpi2-openwrt.yml?query=is%3Asuccess) | arm_cortex-a7_neon-vfpv4 | bcm27xx  |  bcm2709  |
-|   树莓派 3B/3B+    | [✅](https://github.com/SuLingGG/OpenWrt-Mini/actions/workflows/build-rpi3-openwrt.yml?query=is%3Asuccess) |    aarch64_cortex-a53    | bcm27xx  |  bcm2710  |
-|     树莓派 4B      | [✅](https://github.com/SuLingGG/OpenWrt-Mini/actions/workflows/build-rpi4-openwrt.yml?query=is%3Asuccess) |    aarch64_cortex-a72    | bcm27xx  |  bcm2711  |
-|   NanoPi R2S/R4S   | [✅](https://github.com/SuLingGG/OpenWrt-Mini/actions/workflows/build-rockchip-openwrt.yml?query=is%3Asuccess) |     aarch64_generic      | rockchip |   armv8   |
-|   x86_64 (64位)    | [✅](https://github.com/SuLingGG/OpenWrt-Mini/actions/workflows/build-x86_64-openwrt.yml?query=is%3Asuccess) |          x86_64          |   x86    |    64     |
-| x86_generic (32位) | [✅](https://github.com/SuLingGG/OpenWrt-Mini/actions/workflows/build-x86_generic-openwrt.yml?query=is%3Asuccess) |      i386_pentium4       |   x86    |  generic  |
+|   支持设备/版本    |                         下载链接                          |         Platform         |  Target  | Subtarget |
+| :----------------: | :-------------------------------------------------------: | :----------------------: | :------: | :-------: |
+|       竞斗云       | [🔗](http://openwrt.cc/snapshots/targets/ipq40xx/generic/) | arm_cortex-a7_neon-vfpv4 | ipq40xx  |  generic  |
+|     树莓派 2B      | [🔗](http://openwrt.cc/snapshots/targets/bcm27xx/bcm2709/) | arm_cortex-a7_neon-vfpv4 | bcm27xx  |  bcm2709  |
+|   树莓派 3B/3B+    | [🔗](http://openwrt.cc/snapshots/targets/bcm27xx/bcm2710/) |    aarch64_cortex-a53    | bcm27xx  |  bcm2710  |
+|     树莓派 4B      | [🔗](http://openwrt.cc/snapshots/targets/bcm27xx/bcm2711/) |    aarch64_cortex-a72    | bcm27xx  |  bcm2711  |
+|   NanoPi R2S/R4S   | [🔗](http://openwrt.cc/snapshots/targets/rockchip/armv8/)  |     aarch64_generic      | rockchip |   armv8   |
+|   x86_64 (64位)    |     [🔗](http://openwrt.cc/snapshots/targets/x86/64/)      |          x86_64          |   x86    |    64     |
+| x86_generic (32位) |   [🔗](http://openwrt.cc/snapshots/targets/x86/generic/)   |      i386_pentium4       |   x86    |  generic  |
 
 ## 软件包安装指南
 

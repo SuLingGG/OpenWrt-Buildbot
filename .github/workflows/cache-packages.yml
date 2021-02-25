@@ -64,7 +64,6 @@ jobs:
           make download -j$(nproc)
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
-          make download -j1 || true
           mkdir -p /data/cache
           rm -rf /data/cache/dl
           cp -r dl /data/cache

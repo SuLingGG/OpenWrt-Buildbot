@@ -13,7 +13,7 @@ on:
     types: [project, x86_64]
   workflow_dispatch:
   schedule:
-    - cron: 0 0 * * 2,4,6
+    - cron: 0 0 * * *
 #  watch:
 #    types: started
 
@@ -81,6 +81,8 @@ jobs:
         id: package
         run: |
           cd $OPENWRTROOT
+          rm -rf dl
+          cp -r /data/cache/dl .
           echo "CONFIG_ALL=y" >> .config
           make defconfig
           echo -e "$(nproc) threads download"
@@ -143,6 +145,8 @@ jobs:
       - name: Deploy Firmware & Nonshared Packages
         if: steps.generate.outputs.GENERATE_STATUS == 'success'
         run: |
+          cd $FIRMWARE
+          gzip *esxi-flat.vmdk
           rm -rf /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/targets/$TARGET/$SUBTARGET
           mkdir -p /data/www/openwrt.cc/archive/$(date +'%Y-%m-%d')/targets/$TARGET
           mkdir -p /data/www/openwrt.cc/snapshots/targets/$TARGET
@@ -231,7 +235,6 @@ jobs:
           sudo chmod +x /usr/bin/transfer
           cd $OPENWRTROOT/bin/targets/$TARGET/$SUBTARGET
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-          gzip *esxi-flat.vmdk
           rm -rf packages
           df -hT $PWD
           echo "::set-output name=ORGANIZE_STATUS::success"

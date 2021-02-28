@@ -212,7 +212,7 @@ jobs:
           privateKey: ${{ secrets.REMOTE_PRIVATEKEY }}
           debug: false
           command: |
-            cd $WEBROOT
+            cd /data/dnmp/www/openwrt.cc
             mkdir -p snapshots/targets/$TARGET/$SUBTARGET
             mkdir -p snapshots/packages/$PLATFORM
             mkdir -p archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET/$SUBTARGET
@@ -225,7 +225,7 @@ jobs:
         with:
           SSH_PRIVATE_KEY: ${{ secrets.REMOTE_PRIVATEKEY }}
           ARGS: "-avzr --exclude="
-          SOURCE: "${{ env.FIRMWARE }}/"
+          SOURCE: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
           REMOTE_HOST: ${{ secrets.REMOTE_IP }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
           TARGET: "${{ env.WEBROOT }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
@@ -237,7 +237,7 @@ jobs:
         with:
           SSH_PRIVATE_KEY: ${{ secrets.REMOTE_PRIVATEKEY }}
           ARGS: "-avzr --exclude="
-          SOURCE: "${{ env.OPENWRTROOT }}/bin/packages/${{ env.PLATFORM }}/"
+          SOURCE: "openwrt/bin/packages/${{ env.PLATFORM }}/"
           REMOTE_HOST: ${{ secrets.REMOTE_IP }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
           TARGET: "${{ env.WEBROOT }}/snapshots/packages/${{ env.PLATFORM }}/"
@@ -250,8 +250,8 @@ jobs:
           privateKey: ${{ secrets.REMOTE_PRIVATEKEY }}
           debug: false
           command: |
-            cp -rf $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET/$SUBTARGET
-            cp -rf $WEBROOT/snapshots/packages/$PLATFORM $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/packages/$PLATFORM
+            cp -rf /data/dnmp/www/openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET /data/dnmp/www/openwrt.cc/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET/$SUBTARGET
+            cp -rf /data/dnmp/www/openwrt.cc/snapshots/packages/$PLATFORM /data/dnmp/www/openwrt.cc/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/packages/$PLATFORM
 
       - name: Organize Files
         id: organize

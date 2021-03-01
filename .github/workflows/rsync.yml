@@ -1,0 +1,76 @@
+name: Test Rsync
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v1
+
+      - name: Generate temp files
+        run: |
+          mkdir -p /data/source
+          cd /data/source
+          echo 1 > 1.txt
+          echo 2 > 2.txt
+          echo 3 > 3.txt
+          echo 4 > 4.txt
+          echo 5 > 5.txt
+
+      - name: trendyminds/github-actions-rsync
+        uses: trendyminds/github-actions-rsync@master
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.REMOTE_PRIVATEKEY }}
+          SSH_USERNAME: ${{ secrets.REMOTE_USER }}
+          SSH_HOSTNAME: ${{ secrets.REMOTE_IP }}
+        with:
+          RSYNC_OPTIONS: -avzr --delete --exclude node_modules --exclude '.git*'
+          RSYNC_TARGET: /data/test/trendyminds/github-actions-rsync/
+          RSYNC_SOURCE: /data/source/
+
+      - name: Pendect/action-rsyncer
+        id: deploy
+        uses: Pendect/action-rsyncer@v1.1.0
+        env:
+          DEPLOY_KEY: ${{ secrets.REMOTE_PRIVATEKEY }}
+        with:
+          flags: "-avzr --delete"
+          options: ""
+          ssh_options: ""
+          src: "/data/source/"
+          dest: "${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}:/data/test/Pendect/action-rsyncer/"
+
+      - name: Pendect/action-rsyncer (Output)
+        run: echo "${{ steps.deploy.outputs.status }}"
+
+      - name: up9cloud/action-rsync
+        uses: up9cloud/action-rsync@v1.1
+        env:
+          HOST: ${{ secrets.REMOTE_IP }}
+          KEY: ${{ secrets.REMOTE_PRIVATEKEY }}
+          TARGET: /data/test/up9cloud/action-rsync/
+          VERBOSE: true
+          USER: ${{ secrets.REMOTE_USER }}
+          ARGS: -az --exclude=/.git/
+          SSH_ARGS: "-p 22 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+          SOURCE: /data/source/
+          PRE_SCRIPT: |
+            echo start at:
+            date -u
+          POST_SCRIPT: "echo done at: && date -u"
+
+      - name: easingthemes/ssh-deploy
+        uses: easingthemes/ssh-deploy@master
+        continue-on-error: true
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.REMOTE_PRIVATEKEY }}
+          ARGS: "-avzr --exclude="
+          SOURCE: /data/source/
+          REMOTE_HOST: ${{ secrets.REMOTE_IP }}
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          TARGET: "/data/test/easingthemes/ssh-deploy/"

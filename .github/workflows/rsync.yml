@@ -22,17 +22,6 @@ jobs:
           echo 4 > 4.txt
           echo 5 > 5.txt
 
-      - name: trendyminds/github-actions-rsync
-        uses: trendyminds/github-actions-rsync@master
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.REMOTE_PRIVATEKEY }}
-          SSH_USERNAME: ${{ secrets.REMOTE_USER }}
-          SSH_HOSTNAME: ${{ secrets.REMOTE_IP }}
-        with:
-          RSYNC_OPTIONS: -avzr --delete --exclude node_modules --exclude '.git*'
-          RSYNC_TARGET: /data/test/trendyminds/github-actions-rsync/
-          RSYNC_SOURCE: data/source/
-
       - name: Pendect/action-rsyncer
         id: deploy
         uses: Pendect/action-rsyncer@v1.1.0

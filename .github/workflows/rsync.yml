@@ -14,13 +14,13 @@ jobs:
 
       - name: Generate temp files
         run: |
-          sudo mkdir -p /data/source
-          cd /data/source
-          sudo echo 1 > 1.txt
-          sudo echo 2 > 2.txt
-          sudo echo 3 > 3.txt
-          sudo echo 4 > 4.txt
-          sudo echo 5 > 5.txt
+          mkdir -p data/source
+          cd data/source
+          echo 1 > 1.txt
+          echo 2 > 2.txt
+          echo 3 > 3.txt
+          echo 4 > 4.txt
+          echo 5 > 5.txt
 
       - name: trendyminds/github-actions-rsync
         uses: trendyminds/github-actions-rsync@master
@@ -31,7 +31,7 @@ jobs:
         with:
           RSYNC_OPTIONS: -avzr --delete --exclude node_modules --exclude '.git*'
           RSYNC_TARGET: /data/test/trendyminds/github-actions-rsync/
-          RSYNC_SOURCE: /data/source/
+          RSYNC_SOURCE: data/source/
 
       - name: Pendect/action-rsyncer
         id: deploy
@@ -42,7 +42,7 @@ jobs:
           flags: "-avzr --delete"
           options: ""
           ssh_options: ""
-          src: "/data/source/"
+          src: "data/source/"
           dest: "${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}:/data/test/Pendect/action-rsyncer/"
 
       - name: Pendect/action-rsyncer (Output)
@@ -58,7 +58,7 @@ jobs:
           USER: ${{ secrets.REMOTE_USER }}
           ARGS: -az --exclude=/.git/
           SSH_ARGS: "-p 22 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
-          SOURCE: /data/source/
+          SOURCE: data/source/
           PRE_SCRIPT: |
             echo start at:
             date -u
@@ -70,7 +70,7 @@ jobs:
         with:
           SSH_PRIVATE_KEY: ${{ secrets.REMOTE_PRIVATEKEY }}
           ARGS: "-avzr --exclude="
-          SOURCE: /data/source/
+          SOURCE: data/source/
           REMOTE_HOST: ${{ secrets.REMOTE_IP }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
           TARGET: "/data/test/easingthemes/ssh-deploy/"

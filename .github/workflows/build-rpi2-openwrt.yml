@@ -230,17 +230,36 @@ jobs:
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
           TARGET: "/data/dnmp/www/openwrt.cc/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
 
-      - name: Deploy Platform Files To Server
-        uses: easingthemes/ssh-deploy@master
-        if: env.GENERATE_STATUS == 'success'
-        continue-on-error: true
+      - name: Pendect/action-rsyncer
+        id: deploy
+        uses: Pendect/action-rsyncer@v1.1.0
+        env:
+          DEPLOY_KEY: ${{ secrets.REMOTE_PRIVATEKEY }}
         with:
-          SSH_PRIVATE_KEY: ${{ secrets.REMOTE_PRIVATEKEY }}
-          ARGS: "-avzr --exclude="
-          SOURCE: "openwrt/bin/packages/${{ env.PLATFORM }}/"
-          REMOTE_HOST: ${{ secrets.REMOTE_IP }}
-          REMOTE_USER: ${{ secrets.REMOTE_USER }}
-          TARGET: "/data/dnmp/www/openwrt.cc/snapshots/packages/${{ env.PLATFORM }}/"
+          flags: "-avzr --delete"
+          options: ""
+          ssh_options: ""
+          src: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          dest: "${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}:/data/dnmp/www/openwrt.cc/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+
+      - name: Pendect/action-rsyncer (Output)
+        run: echo "${{ steps.deploy.outputs.status }}"
+
+      - name: up9cloud/action-rsync
+        uses: up9cloud/action-rsync@v1.1
+        env:
+          HOST: ${{ secrets.REMOTE_IP }}
+          KEY: ${{ secrets.REMOTE_PRIVATEKEY }}
+          TARGET: /data/dnmp/www/openwrt.cc/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/
+          VERBOSE: true
+          USER: ${{ secrets.REMOTE_USER }}
+          ARGS: -az --exclude=/.git/
+          SSH_ARGS: "-p 22 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+          SOURCE: openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/
+          PRE_SCRIPT: |
+            echo start at:
+            date -u
+          POST_SCRIPT: "echo done at: && date -u"
 
       - name: Deploy Files Archive
         uses: JimCronqvist/action-ssh@master

@@ -31,8 +31,8 @@ jobs:
           flags: "-avzr --delete"
           options: ""
           ssh_options: ""
-          src: "data/source/"
-          dest: "${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}:/data/test/Pendect/action-rsyncer/"
+          src: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          dest: "${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}:/data/dnmp/www/openwrt.cc/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
 
       - name: Pendect/action-rsyncer (Output)
         run: echo "${{ steps.deploy.outputs.status }}"
@@ -42,12 +42,12 @@ jobs:
         env:
           HOST: ${{ secrets.REMOTE_IP }}
           KEY: ${{ secrets.REMOTE_PRIVATEKEY }}
-          TARGET: /data/test/up9cloud/action-rsync/
+          TARGET: /data/dnmp/www/openwrt.cc/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/
           VERBOSE: true
           USER: ${{ secrets.REMOTE_USER }}
           ARGS: -az --exclude=/.git/
           SSH_ARGS: "-p 22 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
-          SOURCE: data/source/
+          SOURCE: openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/
           PRE_SCRIPT: |
             echo start at:
             date -u
@@ -59,7 +59,7 @@ jobs:
         with:
           SSH_PRIVATE_KEY: ${{ secrets.REMOTE_PRIVATEKEY }}
           ARGS: "-avzr --exclude="
-          SOURCE: data/source/
+          SOURCE: openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/
           REMOTE_HOST: ${{ secrets.REMOTE_IP }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
           TARGET: "/data/test/easingthemes/ssh-deploy/"

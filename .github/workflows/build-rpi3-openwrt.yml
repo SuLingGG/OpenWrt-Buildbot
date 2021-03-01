@@ -22,7 +22,6 @@ env:
   REPO_BRANCH: openwrt-18.06-k5.4
   CONFIG_FILE: config/bcm27xx/rpi3-openwrt-target.config
   DIY_SH: scripts/project-openwrt.sh
-  WEBROOT: /data/dnmp/www/openwrt.cc
   UPLOAD_WETRANSFER: true
   UPLOAD_COWTRANSFER: true
 
@@ -229,7 +228,7 @@ jobs:
           SOURCE: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
           REMOTE_HOST: ${{ secrets.REMOTE_IP }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
-          TARGET: "${{ env.WEBROOT }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          TARGET: "/data/dnmp/www/openwrt.cc/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
 
       - name: Deploy Platform Files To Server
         uses: easingthemes/ssh-deploy@master
@@ -241,7 +240,7 @@ jobs:
           SOURCE: "openwrt/bin/packages/${{ env.PLATFORM }}/"
           REMOTE_HOST: ${{ secrets.REMOTE_IP }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
-          TARGET: "${{ env.WEBROOT }}/snapshots/packages/${{ env.PLATFORM }}/"
+          TARGET: "/data/dnmp/www/openwrt.cc/snapshots/packages/${{ env.PLATFORM }}/"
 
       - name: Deploy Files Archive
         uses: JimCronqvist/action-ssh@master

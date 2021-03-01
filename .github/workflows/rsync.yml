@@ -14,13 +14,13 @@ jobs:
 
       - name: Generate temp files
         run: |
-          mkdir -p /data/source
+          sudo mkdir -p /data/source
           cd /data/source
-          echo 1 > 1.txt
-          echo 2 > 2.txt
-          echo 3 > 3.txt
-          echo 4 > 4.txt
-          echo 5 > 5.txt
+          sudo echo 1 > 1.txt
+          sudo echo 2 > 2.txt
+          sudo echo 3 > 3.txt
+          sudo echo 4 > 4.txt
+          sudo echo 5 > 5.txt
 
       - name: trendyminds/github-actions-rsync
         uses: trendyminds/github-actions-rsync@master

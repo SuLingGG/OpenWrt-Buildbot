@@ -213,24 +213,23 @@ jobs:
           SOURCE_PACKAGES: "openwrt/bin/packages/${{ env.PLATFORM }}/"
           DEST_TARGETS: "${{ env.WEBROOT }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
           DEST_PACKAGES: "${{ env.WEBROOT }}/snapshots/packages/${{ env.PLATFORM }}/"
+          REMOTE_PRIVATEKEY: "${{secrets.REMOTE_PRIVATEKEY}}"
+        if: env.GENERATE_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
         run: |
           mkdir -p ~/.ssh/
           install -m 600 /dev/null ~/.ssh/id_rsa
           echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-            bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET \
-              $WEBROOT/snapshots/packages/$PLATFORM'"
-
+          bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET \
+          $WEBROOT/snapshots/packages/$PLATFORM'"
           rsync -chav --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
           rsync -chav --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
-
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-            bash -c "'mkdir -p $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET \
-              mkdir -p $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/packages \
-              cp -rf $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET \
-              cp -rf $WEBROOT/snapshots/packages/$PLATFORM $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/packages'"
+          bash -c "'mkdir -p $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET && \
+          mkdir -p $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/packages && \
+          cp -rf $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET && \
+          cp -rf $WEBROOT/snapshots/packages/$PLATFORM $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/packages'"
 
       - name: Organize Files
         id: organize

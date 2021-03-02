@@ -129,7 +129,7 @@ jobs:
           sed -i "s/subtarget/$SUBTARGET/g" distfeeds.conf
           sed -i "s/target\//$TARGET\//g" distfeeds.conf
           sed -i "s/platform/$PLATFORM/g" distfeeds.conf
-          sed -i "s/date/$(date +'%Y-%m-%d')/g" distfeeds.conf
+          sed -i "s/year/$(date +%Y)/g;s/month/$(date +%m)/g;s/day/$(date +%d)/g" distfeeds.conf
           cd $OPENWRTROOT
           mkdir -p files/etc/opkg
           cp ../data/opkg/distfeeds.conf files/etc/opkg/distfeeds.conf

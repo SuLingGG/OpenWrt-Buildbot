@@ -208,10 +208,10 @@ jobs:
       - name: Deploy Files To Server
         env:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}"
-          SOURCE-TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
-          SOURCE-PACKAGES: "openwrt/bin/packages/${{ env.PLATFORM }}/"
-          DEST-TARGETS: "${{ env.WEBROOT }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
-          DEST-PACKAGES: "${{ env.WEBROOT }}/snapshots/packages/${{ env.PLATFORM }}/"
+          SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          SOURCE_PACKAGES: "openwrt/bin/packages/${{ env.PLATFORM }}/"
+          DEST_TARGETS: "${{ env.WEBROOT }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          DEST_PACKAGES: "${{ env.WEBROOT }}/snapshots/packages/${{ env.PLATFORM }}/"
         run: |
           mkdir -p ~/.ssh/
           install -m 600 /dev/null ~/.ssh/id_rsa
@@ -222,13 +222,8 @@ jobs:
             bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET \
               $WEBROOT/snapshots/packages/$PLATFORM'"
 
-          rsync -chav --delete \
-            -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' \
-            $SOURCE-TARGETS $HOST:$DEST-TARGETS
-
-          rsync -chav --delete \
-            -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' \
-            $SOURCE-PACKAGES $HOST:$DEST-PACKAGES
+          rsync -chav --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
+          rsync -chav --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
 
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
             bash -c "'mkdir -p $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET \

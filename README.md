@@ -27,6 +27,10 @@
 | Allwinner Cortex-A53 | [🔗](http://openwrt.cc/snapshots/targets/sunxi/cortexa53/) |    aarch64_cortex-a53    |  sunxi   | cortexa53 |
 |    x86_64 (64位)     |     [🔗](http://openwrt.cc/snapshots/targets/x86/64/)      |          x86_64          |   x86    |    64     |
 
+完整的设备支持列表参见:
+
+<https://github.com/SuLingGG/OpenWrt-Mini/blob/main/doc/Support-Devices.md>
+
 ## 软件包安装指南
 
 更新软件包索引:
@@ -59,7 +63,7 @@ opkg list | grep luci-app-ssr-plus | grep zh-cn
 opkg install luci-i18n-ssr-plus-zh-cn
 ```
 
-完整的 LuCI APP 列表参见:
+可安装的 LuCI APP 列表:
 
 <https://github.com/SuLingGG/OpenWrt-Mini/blob/main/doc/LuCI-App-List.md>
 

@@ -14,16 +14,18 @@
 - OpenWrt-Rpi 的大多数使用文档也适用于本项目，文档详情请移步 [OpenWrt-Rpi](https://github.com/SuLingGG/OpenWrt-Rpi) 项目的 [README.md](https://github.com/SuLingGG/OpenWrt-Rpi/blob/main/README.md) 页面。
 - 如果你想捐助此项目，请移步: [FUNDING.md](https://github.com/SuLingGG/OpenWrt-Mini/blob/main/FUNDING.md)。
 
-## 设备支持情况
+## 设备/平台支持情况
 
-| 支持设备/版本  |                         下载链接                          |         Platform         |  Target  | Subtarget |
-| :------------: | :-------------------------------------------------------: | :----------------------: | :------: | :-------: |
-|     竞斗云     | [🔗](http://openwrt.cc/snapshots/targets/ipq40xx/generic/) | arm_cortex-a7_neon-vfpv4 | ipq40xx  |  generic  |
-|   树莓派 2B    | [🔗](http://openwrt.cc/snapshots/targets/bcm27xx/bcm2709/) | arm_cortex-a7_neon-vfpv4 | bcm27xx  |  bcm2709  |
-| 树莓派 3B/3B+  | [🔗](http://openwrt.cc/snapshots/targets/bcm27xx/bcm2710/) |    aarch64_cortex-a53    | bcm27xx  |  bcm2710  |
-|   树莓派 4B    | [🔗](http://openwrt.cc/snapshots/targets/bcm27xx/bcm2711/) |    aarch64_cortex-a72    | bcm27xx  |  bcm2711  |
-| NanoPi R2S/R4S | [🔗](http://openwrt.cc/snapshots/targets/rockchip/armv8/)  |     aarch64_generic      | rockchip |   armv8   |
-| x86_64 (64位)  |     [🔗](http://openwrt.cc/snapshots/targets/x86/64/)      |          x86_64          |   x86    |    64     |
+|   支持设备 / 平台    |                         下载链接                          |         Platform         |  Target  | Subtarget |
+| :------------------: | :-------------------------------------------------------: | :----------------------: | :------: | :-------: |
+|   竞斗云 / Acrh17    | [🔗](http://openwrt.cc/snapshots/targets/ipq40xx/generic/) | arm_cortex-a7_neon-vfpv4 | ipq40xx  |  generic  |
+|      树莓派 2B       | [🔗](http://openwrt.cc/snapshots/targets/bcm27xx/bcm2709/) | arm_cortex-a7_neon-vfpv4 | bcm27xx  |  bcm2709  |
+|    树莓派 3B/3B+     | [🔗](http://openwrt.cc/snapshots/targets/bcm27xx/bcm2710/) |    aarch64_cortex-a53    | bcm27xx  |  bcm2710  |
+|      树莓派 4B       | [🔗](http://openwrt.cc/snapshots/targets/bcm27xx/bcm2711/) |    aarch64_cortex-a72    | bcm27xx  |  bcm2711  |
+|    Rockchip 33xx     | [🔗](http://openwrt.cc/snapshots/targets/rockchip/armv8/)  |     aarch64_generic      | rockchip |   armv8   |
+| Allwinner Cortex-A7  | [🔗](http://openwrt.cc/snapshots/targets/sunxi/cortexa7/)  | arm_cortex-a7_neon-vfpv4 |  sunxi   | cortexa7  |
+| Allwinner Cortex-A53 | [🔗](http://openwrt.cc/snapshots/targets/sunxi/cortexa53/) |    aarch64_cortex-a53    |  sunxi   | cortexa53 |
+|    x86_64 (64位)     |     [🔗](http://openwrt.cc/snapshots/targets/x86/64/)      |          x86_64          |   x86    |    64     |
 
 ## 软件包安装指南
 

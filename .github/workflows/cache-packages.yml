@@ -47,7 +47,6 @@ jobs:
         run: |
           cd openwrt
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
-          sed -i "s/immortalwrt\/packages/SuLingGG\/packages/g" feeds.conf.default
           ./scripts/feeds update -a
 
       - name: Install Feeds

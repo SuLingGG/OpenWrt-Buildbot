@@ -6,28 +6,28 @@
 # Blog: https://p3terx.com
 #=================================================
 
-name: Build Raspberry Pi 2 OpenWrt
+name: Build Sunxi Cortex-a7 OpenWrt
 
 on:
   repository_dispatch:
-    types: [project, rpi2]
+    types: [project, sunxi-a7]
   workflow_dispatch:
   schedule:
-    - cron: 0 20 * * 2,4,6
+    - cron: 0 6 * * 2,4,6
 #  watch:
 #    types: started
 
 env:
   REPO_URL: https://github.com/project-openwrt/openwrt
   REPO_BRANCH: openwrt-18.06-k5.4
-  CONFIG_FILE: config/bcm27xx/rpi2-openwrt-target.config
+  CONFIG_FILE: config/sunxi/build-sunxi-cortexa7-target.config
   DIY_SH: scripts/project-openwrt.sh
   WEBROOT: /data/dnmp/www/openwrt.cc
   UPLOAD_WETRANSFER: true
 
 jobs:
   Build:
-    runs-on: project-rpi2
+    runs-on: project-sunxi-a7
 
     outputs:
       PLATFORM: ${{ steps.compile.outputs.PLATFORM }}
@@ -82,7 +82,6 @@ jobs:
           cd $OPENWRTROOT
           rm -rf dl
           cp -r /data/cache/dl .
-          echo "CONFIG_ALL=y" >> .config
           make defconfig
           echo -e "$(nproc) threads download"
           make download -j$(nproc)
@@ -92,11 +91,7 @@ jobs:
       - name: Compile Firmware Packages
         id: compile
         run: |
-          rm -f $OPENWRTROOT/.config*
-          cp $CONFIG_FILE $OPENWRTROOT/.config
-          cat config/firmware-extra.config >> $OPENWRTROOT/.config
           cd $OPENWRTROOT
-          make defconfig
           echo -e "$(nproc) threads compile"
           make tools/compile -j$(nproc) || make tools/compile -j1 V=s
           make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
@@ -132,7 +127,6 @@ jobs:
           cd $OPENWRTROOT
           mkdir -p files/etc/opkg
           cp ../data/opkg/distfeeds.conf files/etc/opkg/distfeeds.conf
-          echo "dtparam=i2c_arm=on,audio=on" >> target/linux/bcm27xx/image/config.txt
           mkdir -p files/etc/uci-defaults/
           cp ../scripts/init-settings.sh files/etc/uci-defaults/99-init-settings
           mkdir -p files/bin
@@ -141,22 +135,8 @@ jobs:
           make target/install -j$(nproc) || make target/install -j1 V=s
           make checksum
           echo "::set-output name=GENERATE_STATUS::success"
-          mkdir -p $OPENWRTROOT/output/bin/targets/$TARGET
-          cp -r $FIRMWARE $OPENWRTROOT/output/bin/targets/$TARGET
-
-      - name: Compile Extra Packages
-        if: steps.generate.outputs.GENERATE_STATUS == 'success'
-        run: |
-          cd $OPENWRTROOT
-          rm -f .config*
-          cp ../$CONFIG_FILE ./.config
-          cat ../config/packages-extra.config >> $OPENWRTROOT/.config
-          make defconfig
-          make diffconfig
-          make package/compile -j$(nproc) IGNORE_ERRORS="y m" || make package/compile -j1 V=s IGNORE_ERRORS="y m"
-          make package/index
-          mkdir -p $OPENWRTROOT/output/bin/packages
-          cp -r bin/packages/$PLATFORM $OPENWRTROOT/output/bin/packages
+          mkdir -p $OPENWRTROOT/output
+          cp -r bin $OPENWRTROOT/output
 
       - name: Compress Bin Folder
         if: steps.generate.outputs.GENERATE_STATUS == 'success'
@@ -209,9 +189,7 @@ jobs:
         env:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}"
           SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
-          SOURCE_PACKAGES: "openwrt/bin/packages/${{ env.PLATFORM }}/"
           DEST_TARGETS: "${{ env.WEBROOT }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
-          DEST_PACKAGES: "${{ env.WEBROOT }}/snapshots/packages/${{ env.PLATFORM }}/"
           REMOTE_PRIVATEKEY: "${{secrets.REMOTE_PRIVATEKEY}}"
         if: env.GENERATE_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
         run: |
@@ -220,33 +198,8 @@ jobs:
           echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET \
-          $WEBROOT/snapshots/packages/$PLATFORM'"
+          bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET'"
           rsync -chav --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
-          rsync -chav --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
           bash -c "'mkdir -p $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET && \
-          mkdir -p $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/packages && \
-          cp -rf $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET && \
-          cp -rf $WEBROOT/snapshots/packages/$PLATFORM $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/packages'"
-
-      - name: Organize Files
-        id: organize
-        if: env.GENERATE_STATUS == 'success'
-        run: |
-          echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET"
-          curl -sL https://git.io/file-transfer | bash -s beta
-          sudo mv transfer /usr/bin
-          sudo chmod +x /usr/bin/transfer
-          cd $OPENWRTROOT/bin/targets/$TARGET/$SUBTARGET
-          echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-          rm -rf packages
-          df -hT $PWD
-          echo "::set-output name=ORGANIZE_STATUS::success"
-
-      - name: Upload Firmware To WeTransfer
-        if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_WETRANSFER == 'true'
-        run: |
-          cd $OPENWRTROOT
-          transfer wet -s -p 16 --no-progress ${FIRMWARE} 2>&1 | tee wetransfer.log
-          echo "::warning file=Firmware-Wetransfer.com::$(cat wetransfer.log | grep https)"
+          cp -rf $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET'"

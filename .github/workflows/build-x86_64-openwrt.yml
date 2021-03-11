@@ -231,12 +231,12 @@ jobs:
           mkdir -p $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/packages && \
           cp -rf $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET && \
           cp -rf $WEBROOT/snapshots/packages/$PLATFORM $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/packages'"
+          echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET"
 
       - name: Organize Files
         id: organize
         if: env.GENERATE_STATUS == 'success' && !cancelled()
         run: |
-          echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET"
           curl -sL https://git.io/file-transfer | bash -s beta
           sudo mv transfer /usr/bin
           sudo chmod +x /usr/bin/transfer

@@ -58,8 +58,6 @@ lemaker_bananapi
 
 lemaker_bananapro
 
-linksprite_pcduino3-nano
-
 linksprite_pcduino3
 
 mele_m9
@@ -82,7 +80,7 @@ xunlong_orangepi-one
 
 xunlong_orangepi-pc
 
-xunlong_orangepi-pc-plus
+xunlong_orangepi-plus
 
 xunlong_orangepi-r1
 
@@ -97,6 +95,8 @@ xunlong_orangepi-zero
 friendlyarm_nanopi-neo-plus2
 
 friendlyarm_nanopi-neo2
+
+friendlyarm_nanopi-r1s-h5
 
 libretech_all-h3-cc-h5
 

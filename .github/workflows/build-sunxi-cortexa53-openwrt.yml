@@ -74,7 +74,7 @@ jobs:
           cat config/docker-support.config >> $OPENWRTROOT/.config
           cd $OPENWRTROOT
           ../$DIY_SH
-          ../scripts/preset-clash-core.sh armv7
+          ../scripts/preset-clash-core.sh armv8
           ../scripts/preset-terminal-tools.sh
 
       - name: Download All Packages

@@ -58,6 +58,8 @@ jobs:
         run: |
           cd openwrt
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
+          chmod +x ../scripts/*.sh
+          ../scripts/revert-docker.sh
           ./scripts/feeds update -a
 
       - name: Install Feeds
@@ -71,7 +73,7 @@ jobs:
           cp $CONFIG_FILE $OPENWRTROOT/.config
           cat config/firmware-extra.config >> $OPENWRTROOT/.config
           cat config/extra-wireless-support.config >> $OPENWRTROOT/.config
-          chmod +x scripts/*.sh
+          cat config/docker-support.config >> $OPENWRTROOT/.config
           cd $OPENWRTROOT
           ../$DIY_SH
           ../scripts/preset-clash-core.sh armv7
@@ -152,6 +154,7 @@ jobs:
           rm -f .config*
           cp ../$CONFIG_FILE ./.config
           cat ../config/packages-extra.config >> $OPENWRTROOT/.config
+          cat ../config/docker-support.config >> $OPENWRTROOT/.config
           make defconfig
           make diffconfig
           make package/compile -j$(nproc) IGNORE_ERRORS="y m" || make package/compile -j1 V=s IGNORE_ERRORS="y m"

@@ -57,6 +57,8 @@ jobs:
         run: |
           cd openwrt
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
+          chmod +x ../scripts/*.sh
+          ../scripts/revert-docker.sh
           ./scripts/feeds update -a
 
       - name: Install Feeds
@@ -69,7 +71,7 @@ jobs:
           [ -e files ] && mv files $OPENWRTROOT/files
           cp $CONFIG_FILE $OPENWRTROOT/.config
           cat config/firmware-extra.config >> $OPENWRTROOT/.config
-          chmod +x scripts/*.sh
+          cat config/docker-support.config >> $OPENWRTROOT/.config
           cd $OPENWRTROOT
           ../$DIY_SH
           ../scripts/preset-clash-core.sh armv7

@@ -73,7 +73,6 @@ jobs:
           cp $CONFIG_FILE $OPENWRTROOT/.config
           cat config/firmware-extra.config >> $OPENWRTROOT/.config
           cat config/extra-wireless-support.config >> $OPENWRTROOT/.config
-          cat config/docker-support.config >> $OPENWRTROOT/.config
           cd $OPENWRTROOT
           ../$DIY_SH
           ../scripts/preset-clash-core.sh amd64
@@ -98,6 +97,7 @@ jobs:
           rm -f $OPENWRTROOT/.config*
           cp $CONFIG_FILE $OPENWRTROOT/.config
           cat config/firmware-extra.config >> $OPENWRTROOT/.config
+          cat config/docker-support.config >> $OPENWRTROOT/.config
           cd $OPENWRTROOT
           make defconfig
           echo -e "$(nproc) threads compile"

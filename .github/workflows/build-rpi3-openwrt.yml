@@ -72,7 +72,6 @@ jobs:
           [ -e files ] && mv files $OPENWRTROOT/files
           cp $CONFIG_FILE $OPENWRTROOT/.config
           cat config/firmware-extra.config >> $OPENWRTROOT/.config
-          cat config/docker-support.config >> $OPENWRTROOT/.config
           cd $OPENWRTROOT
           ../$DIY_SH
           ../scripts/preset-clash-core.sh armv8
@@ -97,6 +96,7 @@ jobs:
           rm -f $OPENWRTROOT/.config*
           cp $CONFIG_FILE $OPENWRTROOT/.config
           cat config/firmware-extra.config >> $OPENWRTROOT/.config
+          cat config/docker-support.config >> $OPENWRTROOT/.config
           cd $OPENWRTROOT
           make defconfig
           echo -e "$(nproc) threads compile"

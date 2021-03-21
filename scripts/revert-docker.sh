@@ -10,7 +10,7 @@ mkdir customfeeds
 git clone --depth=1 https://github.com/immortalwrt/packages.git -b openwrt-18.06 customfeeds/packages
 
 # Change docker to docker-ce
-pushd package/packages/utils
+pushd customfeeds/packages/utils
 rm -rf containerd docker dockerd docker-compose libnetwork runc tini
 svn co https://github.com/coolsnowwolf/packages/trunk/utils/containerd
 svn co https://github.com/coolsnowwolf/packages/trunk/utils/docker-ce

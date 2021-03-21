@@ -6,7 +6,8 @@
 #=================================================
 
 # Clone packages feeds
-git clone --depth=1 https://github.com/immortalwrt/packages.git -b openwrt-18.06 package/packages
+mkdir customfeeds
+git clone --depth=1 https://github.com/immortalwrt/packages.git -b openwrt-18.06 customfeeds/packages
 
 # Change docker to docker-ce
 pushd package/packages/utils
@@ -20,7 +21,7 @@ svn co https://github.com/coolsnowwolf/packages/trunk/utils/tini
 popd
 
 # Set local feeds for packages feeds
-pushd package/packages
+pushd customfeeds/packages
 export packages_feed="$(pwd)"
 popd
 sed -i '/src-git packages/d' feeds.conf.default

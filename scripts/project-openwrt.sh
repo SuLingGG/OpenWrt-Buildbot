@@ -20,7 +20,7 @@ sed -i '/mt7662u_rom_patch.bin/a\\techo mt76-usb disable_usb_sg=1 > $\(1\)\/etc\
 popd
 
 # Fix luci-app-aria2
-pushd feeds/applications
+pushd feeds/luci/applications
 rm -rf luci-app-aria2
 svn co https://github.com/coolsnowwolf/luci/trunk/applications/luci-app-aria2
 popd

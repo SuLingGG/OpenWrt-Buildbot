@@ -1,0 +1,96 @@
+#=================================================
+# https://github.com/P3TERX/Actions-OpenWrt
+# Description: Build OpenWrt using GitHub Actions
+# Lisence: MIT
+# Author: P3TERX
+# Blog: https://p3terx.com
+#=================================================
+
+name: Update DL Mirror
+
+on:
+  repository_dispatch:
+    types: [mirror]
+  workflow_dispatch:
+  schedule:
+    - cron: 0 18 * * *
+#  watch:
+#    types: started
+
+env:
+  OFFICAL_MASTER: "https://github.com/project-openwrt/openwrt -b master"
+  LEAN_MASTER: "https://github.com/coolsnowwolf/lede -b master"
+  IMMORTALWRT_MASTER: "https://github.com/immortalwrt/immortalwrt -b master"
+  IMMORTALWRT_18.06: "https://github.com/immortalwrt/immortalwrt -b openwrt-18.06"
+  WEBROOT: /data/dnmp/www/openwrt.cc
+
+jobs:
+  Build:
+    runs-on: ubuntu-18.04
+    continue-on-error: false
+    strategy:
+      fail-fast: false
+      matrix:
+        REPO_URL: [$OFFICAL_MASTER,$LEAN_MASTER,$IMMORTALWRT_18.06,$IMMORTALWRT_MASTER]
+        REPO_NAME: [OFFICAL_MASTER,LEAN_MASTER,IMMORTALWRT_18.06,IMMORTALWRT_MASTER]
+        DIR_PATH: [openwrt/master,lede/master,immortalwrt/openwrt-18.06,immortalwrt/master]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Initialization Environment
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804)
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+          sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+
+      - name: Clone Source Code
+        run: |
+          df -hT $PWD
+          git clone --depth 1 ${{ matrix.REPO_URL }} ${{ matrix.REPO_NAME }}
+
+      - name: Update Feeds
+        run: |
+          cd ${{ matrix.REPO_NAME }}
+          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
+          ./scripts/feeds update -a
+
+      - name: Install Feeds
+        run: |
+          cd $OPENWRTROOT
+          ./scripts/feeds install -a
+
+      - name: Download All Packages
+        id: download
+        run: |
+          cd $OPENWRTROOT
+          echo "CONFIG_ALL=y" >> .config
+          make defconfig
+          make download -j16
+          find dl -size -1024c -exec ls -l {} \;
+          find dl -size -1024c -exec rm -f {} \;
+          echo "::set-output name=DOWNLOAD_STATUS::success"
+
+      - name: Deploy Files To Server
+        env:
+          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}"
+          SOURCE_DL: "${{ matrix.REPO_NAME }}/dl/"
+          DEST_DL: "${{ env.WEBROOT }}/dl/${{ matrix.DIR_PATH }}/"
+          REMOTE_PRIVATEKEY: "${{secrets.REMOTE_PRIVATEKEY}}"
+        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
+        run: |
+          mkdir -p ~/.ssh/
+          install -m 600 /dev/null ~/.ssh/id_rsa
+          echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
+          bash -c "'mkdir -p $WEBROOT/dl/${{ matrix.DIR_PATH }}'"
+          rsync -chav --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_DL $HOST:$DEST_DL
+          echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/${{ matrix.DIR_PATH }}"
+

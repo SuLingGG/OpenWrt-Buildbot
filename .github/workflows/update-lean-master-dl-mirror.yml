@@ -12,13 +12,12 @@ on:
   repository_dispatch:
   workflow_dispatch:
   schedule:
-    - cron: 0 18 * * *
+    - cron: 0 20 * * *
 #  watch:
 #    types: started
 
 env:
   REPO_URL: https://github.com/coolsnowwolf/lede
-  DIR_PATH: lede/master
   REPO_BRANCH: master
   WEBROOT: /data/dnmp/www/openwrt.cc
 
@@ -72,7 +71,7 @@ jobs:
         env:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}"
           SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "${{ env.WEBROOT }}/dl/$DIR_PATH/"
+          DEST_DL: "${{ env.WEBROOT }}/dl/lede/master/"
           REMOTE_PRIVATEKEY: "${{secrets.REMOTE_PRIVATEKEY}}"
         if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
         run: |
@@ -81,7 +80,7 @@ jobs:
           echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $WEBROOT/dl/$DIR_PATH'"
+          bash -c "'mkdir -p $WEBROOT/dl/lede/master'"
           rsync -chav --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_DL $HOST:$DEST_DL
-          echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/$DIR_PATH"
+          echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/lede/master"
 

@@ -17,8 +17,9 @@ on:
 #    types: started
 
 env:
-  REPO_URL: "https://github.com/immortalwrt/immortalwrt"
-  REPO_BRANCH: "openwrt-18.06"
+  REPO_URL: https://github.com/immortalwrt/immortalwrt
+  REPO_BRANCH: openwrt-18.06
+  DIR_PATH: immortalwrt/openwrt-18.06
   WEBROOT: /data/dnmp/www/openwrt.cc
 
 jobs:
@@ -71,7 +72,7 @@ jobs:
         env:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}"
           SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "${{ env.WEBROOT }}/dl/openwrt/master/"
+          DEST_DL: "${{ env.WEBROOT }}/dl/$DIR_PATH/"
           REMOTE_PRIVATEKEY: "${{secrets.REMOTE_PRIVATEKEY}}"
         if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
         run: |
@@ -80,7 +81,6 @@ jobs:
           echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $WEBROOT/dl/openwrt/master'"
+          bash -c "'mkdir -p $WEBROOT/dl/$DIR_PATH'"
           rsync -chav --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_DL $HOST:$DEST_DL
-          echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/openwrt/master"
-
+          echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/$DIR_PATH"

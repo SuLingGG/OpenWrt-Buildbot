@@ -27,8 +27,11 @@ popd
 sed -i '/src-git packages/d' feeds.conf.default
 echo "src-link packages $packages_feed" >> feeds.conf.default
 
+# Update feeds
+./scripts/feeds update -a
+
 # Replace dockerd to docker-ce for luci-app-docker & luci-app-dockerman
-pushd package/ctcgfw/luci-app-dockerman
+pushd feeds/luci/applications/luci-app-dockerman
 sed -i 's/ +dockerd/-ce/g' Makefile
 popd
 pushd package/lean/luci-app-docker

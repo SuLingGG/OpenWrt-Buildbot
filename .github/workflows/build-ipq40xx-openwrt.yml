@@ -60,7 +60,6 @@ jobs:
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
           chmod +x ../scripts/*.sh
           ../scripts/revert-docker.sh
-          ./scripts/feeds update -a
 
       - name: Install Feeds
         run: |

@@ -14,6 +14,18 @@ sed -i '/http/d' zzz-default-settings
 sed -i '/openwrt_luci/d' zzz-default-settings
 popd
 
+# Clone community packages to package/community
+mkdir package/community
+pushd package/community
+
+# Add luci-app-dnsfilter
+git clone --depth=1 https://github.com/garypang13/luci-app-dnsfilter
+
+# Add luci-app-bypass
+git clone --depth=1 https://github.com/garypang13/luci-app-bypass
+sed -i 's/smartdns-le/smartdns/g' luci-app-bypass/Makefile
+popd
+
 # Fix mt76 wireless driver
 pushd package/kernel/mt76
 sed -i '/mt7662u_rom_patch.bin/a\\techo mt76-usb disable_usb_sg=1 > $\(1\)\/etc\/modules.d\/mt76-usb' Makefile

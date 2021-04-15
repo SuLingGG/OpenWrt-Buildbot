@@ -27,6 +27,9 @@ sed -i 's/smartdns-le/smartdns/g' luci-app-bypass/Makefile
 
 # Add luci-app-godproxy
 git clone --depth=1 https://github.com/project-lede/luci-app-godproxy
+
+# Add luci-app-oaf
+git clone --depth=1 https://github.com/destan19/OpenAppFilter
 popd
 
 # Fix mt76 wireless driver

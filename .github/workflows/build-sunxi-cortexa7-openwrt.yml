@@ -81,6 +81,7 @@ jobs:
         id: package
         run: |
           cd $OPENWRTROOT
+          wget https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
           rm -rf dl
           cp -r /data/cache/dl .
           make defconfig
@@ -98,7 +99,7 @@ jobs:
           make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
           make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
           make diffconfig
-          make package/compile -j$(nproc) IGNORE_ERRORS="y m" || make package/compile -j1 V=s IGNORE_ERRORS="y m"
+          make package/compile -j$(nproc) IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
           make package/index
           cd $OPENWRTROOT/bin/packages/*
           PLATFORM=$(basename `pwd`)
@@ -124,16 +125,17 @@ jobs:
           sed -i "s/subtarget/$SUBTARGET/g" distfeeds.conf
           sed -i "s/target\//$TARGET\//g" distfeeds.conf
           sed -i "s/platform/$PLATFORM/g" distfeeds.conf
-          sed -i "s/year/$(date +%Y)/g;s/month/$(date +%m)/g;s/day/$(date +%d)/g" distfeeds.conf
           cd $OPENWRTROOT
           mkdir -p files/etc/opkg
           cp ../data/opkg/distfeeds.conf files/etc/opkg/distfeeds.conf
+          mkdir -p files/www/snapshots
+          cp -r bin/targets files/www/snapshots
           mkdir -p files/etc/uci-defaults/
           cp ../scripts/init-settings.sh files/etc/uci-defaults/99-init-settings
           mkdir -p files/bin
           cp ../scripts/ipv6-helper.sh files/bin/ipv6-helper
-          make package/install -j$(nproc) || make package/install -j1 V=s
-          make target/install -j$(nproc) || make target/install -j1 V=s
+          make package/install -j1 V=s
+          make target/install -j1 V=s
           make checksum
           echo "::set-output name=GENERATE_STATUS::success"
           mkdir -p $OPENWRTROOT/output

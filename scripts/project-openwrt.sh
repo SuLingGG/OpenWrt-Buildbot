@@ -32,6 +32,15 @@ git clone --depth=1 https://github.com/project-lede/luci-app-godproxy
 git clone --depth=1 https://github.com/destan19/OpenAppFilter
 popd
 
+# Use Lean's qBittorrent
+pushd package/lean
+rm -rf luci-app-qbittorrent qBittorrent-Enhanced-Edition qt5
+svn co https://github.com/coolsnowwolf/lede/trunk/package/lean/rblibtorrent
+svn co https://github.com/coolsnowwolf/lede/trunk/package/lean/luci-app-qbittorrent
+svn co https://github.com/coolsnowwolf/lede/trunk/package/lean/qBittorrent
+svn co https://github.com/coolsnowwolf/lede/trunk/package/lean/qt5
+popd
+
 # Fix mt76 wireless driver
 pushd package/kernel/mt76
 sed -i '/mt7662u_rom_patch.bin/a\\techo mt76-usb disable_usb_sg=1 > $\(1\)\/etc\/modules.d\/mt76-usb' Makefile

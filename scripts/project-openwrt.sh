@@ -23,7 +23,7 @@ git clone --depth=1 https://github.com/garypang13/luci-app-dnsfilter
 
 # Add luci-app-bypass
 git clone --depth=1 https://github.com/garypang13/luci-app-bypass
-sed -i 's/smartdns-le/smartdns/g' luci-app-bypass/Makefile
+git clone --depth=1 https://github.com/garypang13/smartdns-le
 
 # Add luci-app-godproxy
 git clone --depth=1 https://github.com/project-lede/luci-app-godproxy

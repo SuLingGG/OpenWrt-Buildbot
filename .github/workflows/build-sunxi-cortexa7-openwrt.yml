@@ -10,7 +10,6 @@ name: Build Sunxi Cortex-a7 OpenWrt
 
 on:
   repository_dispatch:
-    types: [project, sunxi-a7]
   workflow_dispatch:
   schedule:
     - cron: 0 6 * * 2,4,6
@@ -23,10 +22,9 @@ env:
   CONFIG_FILE: config/sunxi/build-sunxi-cortexa7-target.config
   DIY_SH: scripts/project-openwrt.sh
   WEBROOT: /data/dnmp/www/openwrt.cc
-  UPLOAD_WETRANSFER: true
 
 jobs:
-  Build:
+  Toolchain:
     runs-on: project-sunxi-a7
 
     outputs:
@@ -47,6 +45,16 @@ jobs:
           sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804)
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
+          rm -rf /data/disk/project-sunxi-a7/*
+          fallocate -l 50G openwrt.img
+          echo 'type=83' | sfdisk openwrt.img
+          sudo losetup -f -P openwrt.img
+          sudo mkfs.ext4 /dev/loop0p1
+          mkdir openwrt
+          sudo mount /dev/loop0p1 openwrt
+          sudo chown -R suling:suling openwrt
+          cd openwrt
+          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
 
       - name: Clone Source Code
         run: |
@@ -56,8 +64,7 @@ jobs:
       - name: Update Feeds
         id: update
         run: |
-          cd openwrt
-          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
+          cd $OPENWRTROOT
           chmod +x ../scripts/*.sh
           ../scripts/revert-docker.sh
 
@@ -90,13 +97,56 @@ jobs:
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
+      - name: Compile Tools
+        id: tools
+        run: |
+          cd $OPENWRTROOT
+          echo -e "$(nproc) threads compile"
+          make tools/install -j$(nproc) || make tools/install -j1 V=s
+
+      - name: Compile Toolchain
+        id: toolchain
+        run: |
+          cd $OPENWRTROOT
+          echo -e "$(nproc) threads compile"
+          make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
+
+      - name: Prepare Disk Image
+        run: |
+          sync
+          sudo umount /dev/loop0p1
+          sudo losetup -d /dev/loop0
+          mkdir -p /data/disk/project-sunxi-a7
+          mv openwrt.img /data/disk/project-sunxi-a7
+
+  Firmware:
+    needs: [Toolchain]
+    runs-on: project-sunxi-a7
+    outputs:
+      PLATFORM: ${{ steps.compile.outputs.PLATFORM }}
+      TARGET: ${{ steps.compile.outputs.TARGET }}
+      SUBTARGET: ${{ steps.compile.outputs.SUBTARGET }}
+      GENERATE_STATUS: ${{ steps.generate.outputs.GENERATE_STATUS }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Restore Disk Image
+        run: |
+          mv /data/disk/project-sunxi-a7/openwrt.img .
+          sudo losetup -f -P openwrt.img
+          mkdir openwrt
+          sudo mount /dev/loop0p1 openwrt
+          sudo chown -R suling:suling openwrt
+          cd openwrt
+          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
+
       - name: Compile Firmware Packages
         id: compile
         run: |
           cd $OPENWRTROOT
           echo -e "$(nproc) threads compile"
-          make tools/install -j$(nproc) || make tools/install -j1 V=s
-          make toolchain/install -j$(nproc) || make toolchain/install -j1 V=s
           make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
           make diffconfig
           make package/compile -j$(nproc) || make package/compile -j1 V=s
@@ -155,8 +205,16 @@ jobs:
           name: bin-archive
           path: openwrt/output
 
+      - name: Prepare Disk Image
+        run: |
+          sync
+          sudo umount /dev/loop0p1
+          sudo losetup -d /dev/loop0
+          mv openwrt.img /data/disk/project-sunxi-a7
+          df -hT $PWD
+
   Upload:
-    needs: [Build]
+    needs: [Firmware]
     runs-on: ubuntu-18.04
 
     steps:
@@ -207,3 +265,4 @@ jobs:
           bash -c "'mkdir -p $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET && \
           cp -rf $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET'"
           echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET"
+

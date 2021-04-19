@@ -39,7 +39,7 @@ jobs:
           sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804)
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
-          rm -rf /data/disk/project-r2s/*
+          rm -rf openwrt.img
           fallocate -l 150G openwrt.img
           echo 'type=83' | sfdisk openwrt.img
           sudo losetup -f -P openwrt.img
@@ -262,7 +262,6 @@ jobs:
           sync
           sudo umount /dev/loop0p1
           sudo losetup -d /dev/loop0
-          mv openwrt.img /data/disk/project-r2s
           df -hT $PWD
 
   Upload:

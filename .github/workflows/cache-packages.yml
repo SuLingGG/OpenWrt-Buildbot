@@ -10,7 +10,6 @@ name: Cache OpenWrt Packages
 
 on:
   repository_dispatch:
-    types: [cache]
   workflow_dispatch:
   schedule:
     - cron: 0 18 * * *

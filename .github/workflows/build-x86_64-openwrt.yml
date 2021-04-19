@@ -74,7 +74,7 @@ jobs:
           cat config/firmware-extra.config >> $OPENWRTROOT/.config
           cd $OPENWRTROOT
           ../$DIY_SH
-          ../scripts/preset-clash-core.sh armv8
+          ../scripts/preset-clash-core.sh amd64
           ../scripts/preset-terminal-tools.sh
           ../scripts/enable-rpi4-wifi.sh
 

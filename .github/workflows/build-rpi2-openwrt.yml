@@ -72,6 +72,7 @@ jobs:
           [ -e files ] && mv files $OPENWRTROOT/files
           cp $CONFIG_FILE $OPENWRTROOT/.config
           cat config/firmware-extra.config >> $OPENWRTROOT/.config
+          cat config/extra-wireless-support.config >> $OPENWRTROOT/.config
           cd $OPENWRTROOT
           ../$DIY_SH
           ../scripts/preset-clash-core.sh armv7

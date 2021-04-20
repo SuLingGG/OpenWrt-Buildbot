@@ -90,7 +90,7 @@ jobs:
         id: package
         run: |
           cd $OPENWRTROOT
-          wget https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
+          wget -q https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
           rm -rf dl
           cp -r /data/cache/dl .
           make defconfig
@@ -111,7 +111,7 @@ jobs:
         run: |
           cd $OPENWRTROOT
           echo -e "$(nproc) threads compile"
-          make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
+          make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
 
       - name: Prepare Disk Image
         if: always()

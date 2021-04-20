@@ -111,7 +111,7 @@ jobs:
         run: |
           cd $OPENWRTROOT
           echo -e "$(nproc) threads compile"
-          make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
+          make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
 
       - name: Prepare Disk Image
         if: always()

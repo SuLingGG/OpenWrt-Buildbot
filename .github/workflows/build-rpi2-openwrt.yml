@@ -55,7 +55,7 @@ jobs:
           df -hT $PWD
           git clone --depth 1 $REPO_URL -b $REPO_BRANCH
           mv immortalwrt/* openwrt
-          mv immortalwrt/.* openwrt
+          mv immortalwrt/.git* openwrt
 
       - name: Update Feeds
         id: update
@@ -113,18 +113,13 @@ jobs:
           make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
 
       - name: Prepare Disk Image
+        if: always()
         run: |
           sync
-          sudo umount /dev/loop0p1
-          sudo losetup -d /dev/loop0
-          mkdir -p /data/disk/project-rpi2
-          mv openwrt.img /data/disk/project-rpi2
-
-      - name: Umount Loop Device When Failure 
-        if: job.status == 'failure'
-        run: |
           sudo umount /dev/loop*p1 || true
           sudo losetup -d /dev/loop0 || sudo losetup -d /dev/loop? || true
+          mkdir -p /data/disk/project-rpi2
+          mv openwrt.img /data/disk/project-rpi2
 
   Firmware:
     needs: [Toolchain]
@@ -206,17 +201,12 @@ jobs:
           cp -r $FIRMWARE $OPENWRTROOT/output/bin/targets/$TARGET
 
       - name: Prepare Disk Image
+        if: always()
         run: |
           sync
-          sudo umount /dev/loop0p1
-          sudo losetup -d /dev/loop0
-          mv openwrt.img /data/disk/project-rpi2
-
-      - name: Umount Loop Device When Failure 
-        if: job.status == 'failure'
-        run: |
           sudo umount /dev/loop*p1 || true
           sudo losetup -d /dev/loop0 || sudo losetup -d /dev/loop? || true
+          mv openwrt.img /data/disk/project-rpi2
 
   Extra-Packages:
     needs: [Firmware]
@@ -273,17 +263,12 @@ jobs:
           path: openwrt/output
 
       - name: Prepare Disk Image
+        if: always()
         run: |
           sync
-          sudo umount /dev/loop0p1
-          sudo losetup -d /dev/loop0
-          df -hT $PWD
-
-      - name: Umount Loop Device When Failure 
-        if: job.status == 'failure'
-        run: |
           sudo umount /dev/loop*p1 || true
           sudo losetup -d /dev/loop0 || sudo losetup -d /dev/loop? || true
+          df -hT $PWD
 
   Upload:
     needs: [Extra-Packages]

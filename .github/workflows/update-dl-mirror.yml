@@ -58,7 +58,7 @@ jobs:
         id: download
         run: |
           cd $OPENWRTROOT
-          wget https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
+          wget -q https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
           echo "CONFIG_ALL=y" >> .config
           make defconfig
           make download -j16
@@ -122,7 +122,7 @@ jobs:
         id: download
         run: |
           cd $OPENWRTROOT
-          wget https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
+          wget -q https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
           echo "CONFIG_ALL=y" >> .config
           make defconfig
           make download -j16
@@ -186,7 +186,7 @@ jobs:
         id: download
         run: |
           cd $OPENWRTROOT
-          wget https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
+          wget -q https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
           echo "CONFIG_ALL=y" >> .config
           make defconfig
           make download -j16

@@ -84,7 +84,7 @@ jobs:
         id: package
         run: |
           cd $OPENWRTROOT
-          wget https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
+          wget -q https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
           rm -rf dl
           cp -r /data/cache/dl .
           echo "CONFIG_ALL=y" >> .config

@@ -57,7 +57,7 @@ jobs:
       - name: Download All Packages
         run: |
           cd $OPENWRTROOT
-          wget https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
+          wget -q https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
           echo "CONFIG_ALL=y" >> .config
           make defconfig
           echo -e "$(nproc) threads download"

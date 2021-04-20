@@ -234,7 +234,7 @@ jobs:
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
 
       - name: Compile Extra Packages
-        if: steps.generate.outputs.GENERATE_STATUS == 'success'
+        if: env.GENERATE_STATUS == 'success'
         run: |
           cd $OPENWRTROOT
           rm -f .config*
@@ -249,7 +249,7 @@ jobs:
           cp -r bin/packages/$PLATFORM $OPENWRTROOT/output/bin/packages
 
       - name: Compress Bin Folder
-        if: steps.generate.outputs.GENERATE_STATUS == 'success'
+        if: env.GENERATE_STATUS == 'success'
         run: |
           cd $OPENWRTROOT/output
           zip -q -s 500m -r bin-archive.zip bin
@@ -257,7 +257,7 @@ jobs:
 
       - name: Upload Bin Archive
         uses: actions/upload-artifact@main
-        if: steps.generate.outputs.GENERATE_STATUS == 'success'
+        if: env.GENERATE_STATUS == 'success'
         with:
           name: bin-archive
           path: openwrt/output

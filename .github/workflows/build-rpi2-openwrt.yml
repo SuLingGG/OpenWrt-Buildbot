@@ -17,7 +17,7 @@ on:
 #    types: started
 
 env:
-  REPO_URL: https://github.com/project-openwrt/openwrt
+  REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: openwrt-18.06-k5.4
   CONFIG_FILE: config/bcm27xx/rpi2-openwrt-target.config
   DIY_SH: scripts/project-openwrt.sh
@@ -53,7 +53,9 @@ jobs:
       - name: Clone Source Code
         run: |
           df -hT $PWD
-          git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+          git clone --depth 1 $REPO_URL -b $REPO_BRANCH
+          mv immortalwrt/* openwrt
+          mv immortalwrt/.* openwrt
 
       - name: Update Feeds
         id: update
@@ -117,6 +119,12 @@ jobs:
           sudo losetup -d /dev/loop0
           mkdir -p /data/disk/project-rpi2
           mv openwrt.img /data/disk/project-rpi2
+
+      - name: Umount Loop Device When Failure 
+        if: job.status == 'failure'
+        run: |
+          sudo umount /dev/loop*p1 || true
+          sudo losetup -d /dev/loop0 || sudo losetup -d /dev/loop? || true
 
   Firmware:
     needs: [Toolchain]
@@ -204,6 +212,12 @@ jobs:
           sudo losetup -d /dev/loop0
           mv openwrt.img /data/disk/project-rpi2
 
+      - name: Umount Loop Device When Failure 
+        if: job.status == 'failure'
+        run: |
+          sudo umount /dev/loop*p1 || true
+          sudo losetup -d /dev/loop0 || sudo losetup -d /dev/loop? || true
+
   Extra-Packages:
     needs: [Firmware]
     runs-on: project-rpi2
@@ -264,6 +278,12 @@ jobs:
           sudo umount /dev/loop0p1
           sudo losetup -d /dev/loop0
           df -hT $PWD
+
+      - name: Umount Loop Device When Failure 
+        if: job.status == 'failure'
+        run: |
+          sudo umount /dev/loop*p1 || true
+          sudo losetup -d /dev/loop0 || sudo losetup -d /dev/loop? || true
 
   Upload:
     needs: [Extra-Packages]

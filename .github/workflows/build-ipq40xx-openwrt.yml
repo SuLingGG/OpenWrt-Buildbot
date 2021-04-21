@@ -28,6 +28,9 @@ jobs:
   Toolchain:
     runs-on: project-gdock
 
+    outputs:
+      TOOLCHAIN_STATUS: ${{ steps.toolchain.outputs.TOOLCHAIN_STATUS }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@main
@@ -55,6 +58,7 @@ jobs:
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
 
       - name: Clone Source Code
+        id: clone
         run: |
           df -hT $PWD
           git clone --depth 1 $REPO_URL -b $REPO_BRANCH
@@ -69,11 +73,13 @@ jobs:
           ../scripts/revert-docker.sh
 
       - name: Install Feeds
+        id: install
         run: |
           cd $OPENWRTROOT
           ./scripts/feeds install -a
 
       - name: Load Custom Configuration
+        id: load
         run: |
           [ -e files ] && mv files $OPENWRTROOT/files
           cp $CONFIG_FILE $OPENWRTROOT/.config
@@ -85,7 +91,7 @@ jobs:
           ../scripts/preset-terminal-tools.sh
 
       - name: Download All Packages
-        id: package
+        id: download
         run: |
           cd $OPENWRTROOT
           wget -q https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
@@ -110,8 +116,10 @@ jobs:
           cd $OPENWRTROOT
           echo -e "$(nproc) threads compile"
           make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
+          echo "::set-output name=TOOLCHAIN_STATUS::success"
 
       - name: Prepare Disk Image
+        id: prepare
         if: always()
         run: |
           sync
@@ -121,7 +129,7 @@ jobs:
           mv openwrt.img /data/disk/$RUNNER
 
   Firmware:
-    if: needs.Toolchain.result == 'success'
+    if: needs.Toolchain.outputs.TOOLCHAIN_STATUS == 'success'
     needs: [Toolchain]
     runs-on: project-gdock
     outputs:
@@ -149,6 +157,7 @@ jobs:
 
       - name: Compile Firmware Packages
         id: compile
+        timeout-minutes: 330
         run: |
           cd $OPENWRTROOT
           echo -e "$(nproc) threads compile"
@@ -198,6 +207,7 @@ jobs:
 
       - name: Compress Bin Folder
         if: steps.generate.outputs.GENERATE_STATUS == 'success'
+        id: compress
         run: |
           cd $OPENWRTROOT/output
           zip -q -s 500m -r bin-archive.zip bin
@@ -206,12 +216,14 @@ jobs:
       - name: Upload Bin Archive
         uses: actions/upload-artifact@main
         if: steps.generate.outputs.GENERATE_STATUS == 'success'
+        id: upload
         with:
           name: bin-archive
           path: openwrt/output
 
       - name: Prepare Disk Image
         if: always()
+        id: prepare
         run: |
           sync
           sudo umount ${LOOP}p1 || true
@@ -220,7 +232,7 @@ jobs:
           mv openwrt.img /data/disk/$RUNNER
 
   Upload:
-    if: needs.Firmware.result == 'success'
+    if: needs.Firmware.outputs.GENERATE_STATUS == 'success'
     needs: [Firmware]
     runs-on: ubuntu-18.04
 
@@ -229,21 +241,21 @@ jobs:
         uses: actions/checkout@main
 
       - name: Restore Variables
+        id: restore
         run: |
-          echo "PLATFORM=$(echo '${{needs.Build.outputs.PLATFORM}}')" >> $GITHUB_ENV
-          echo "TARGET=$(echo '${{needs.Build.outputs.TARGET}}')" >> $GITHUB_ENV
-          echo "SUBTARGET=$(echo '${{needs.Build.outputs.SUBTARGET}}')" >> $GITHUB_ENV
-          echo "GENERATE_STATUS=$(echo '${{needs.Build.outputs.GENERATE_STATUS}}')" >> $GITHUB_ENV
+          echo "PLATFORM=$(echo '${{needs.Firmware.outputs.PLATFORM}}')" >> $GITHUB_ENV
+          echo "TARGET=$(echo '${{needs.Firmware.outputs.TARGET}}')" >> $GITHUB_ENV
+          echo "SUBTARGET=$(echo '${{needs.Firmware.outputs.SUBTARGET}}')" >> $GITHUB_ENV
 
       - name: Download Bin Archive
+        id: download
         uses: actions/download-artifact@v2
-        if: env.GENERATE_STATUS == 'success'
         with:
           name: bin-archive
           path: openwrt
 
       - name: Decompress Bin Folder
-        if: env.GENERATE_STATUS == 'success'
+        id: decompress
         run: |
           sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
           cd openwrt
@@ -254,12 +266,13 @@ jobs:
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
 
       - name: Deploy Files To Server
+        id: deploy
         env:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}"
           SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
           DEST_TARGETS: "${{ env.WEBROOT }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
           REMOTE_PRIVATEKEY: "${{secrets.REMOTE_PRIVATEKEY}}"
-        if: env.GENERATE_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
+        if: env.REMOTE_PRIVATEKEY != null
         run: |
           mkdir -p ~/.ssh/
           install -m 600 /dev/null ~/.ssh/id_rsa

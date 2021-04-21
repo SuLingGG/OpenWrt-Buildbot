@@ -47,7 +47,7 @@ jobs:
           rm -rf openwrt.img
           fallocate -l 50G openwrt.img
           echo 'type=83' | sfdisk openwrt.img
-          export LOOP="sudo losetup -f -P --show openwrt.img"
+          export LOOP="$(sudo losetup -f -P --show openwrt.img)"
           echo "LOOP=$LOOP" >> $GITHUB_ENV
           echo "::set-output name=LOOP::$(echo $LOOP)"
           sudo mkfs.ext4 ${LOOP}p1

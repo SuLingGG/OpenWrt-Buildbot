@@ -28,9 +28,6 @@ jobs:
   Toolchain:
     runs-on: project-gdock
 
-    outputs:
-      LOOP: ${{ steps.init.outputs.LOOP }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@main
@@ -114,38 +111,24 @@ jobs:
           echo -e "$(nproc) threads compile"
           make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
 
-  End-Toolchain:
-    if: always()
-    needs: [Toolchain]
-    runs-on: project-gdock
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@main
-
-      - name: Restore Variables
-        run: |
-          echo "LOOP=$(echo '${{needs.Toolchain.outputs.LOOP}}')" >> $GITHUB_ENV
-
       - name: Prepare Disk Image
         if: always()
         run: |
           sync
           sudo umount ${LOOP}p1 || true
-          sudo losetup -D || true
+          sudo losetup -d $LOOP || true
           mkdir -p /data/disk/$RUNNER
           mv openwrt.img /data/disk/$RUNNER
 
   Firmware:
     if: needs.Toolchain.result == 'success'
-    needs: [End-Toolchain]
+    needs: [Toolchain]
     runs-on: project-gdock
     outputs:
       PLATFORM: ${{ steps.compile.outputs.PLATFORM }}
       TARGET: ${{ steps.compile.outputs.TARGET }}
       SUBTARGET: ${{ steps.compile.outputs.SUBTARGET }}
       GENERATE_STATUS: ${{ steps.generate.outputs.GENERATE_STATUS }}
-      LOOP: ${{ steps.init.outputs.LOOP }}
 
     steps:
       - name: Checkout
@@ -227,31 +210,18 @@ jobs:
           name: bin-archive
           path: openwrt/output
 
-  End-Firmware:
-    if: always()
-    needs: [Firmware]
-    runs-on: project-gdock
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@main
-
-      - name: Restore Variables
-        run: |
-          echo "LOOP=$(echo '${{needs.Firmware.outputs.LOOP}}')" >> $GITHUB_ENV
-
       - name: Prepare Disk Image
         if: always()
         run: |
           sync
           sudo umount ${LOOP}p1 || true
-          sudo losetup -D || true
+          sudo losetup -d $LOOP || true
           mkdir -p /data/disk/$RUNNER
           mv openwrt.img /data/disk/$RUNNER
 
   Upload:
     if: needs.Firmware.result == 'success'
-    needs: [End-Firmware]
+    needs: [Firmware]
     runs-on: ubuntu-18.04
 
     steps:

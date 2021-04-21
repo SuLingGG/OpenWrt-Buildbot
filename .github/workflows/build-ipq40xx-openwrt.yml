@@ -137,7 +137,7 @@ jobs:
           mv openwrt.img /data/disk/$RUNNER
 
   Firmware:
-    if: needs.Toolchain.result = success
+    if: needs.Toolchain.result == 'success'
     needs: [End-Toolchain]
     runs-on: project-gdock
     outputs:
@@ -250,7 +250,7 @@ jobs:
           mv openwrt.img /data/disk/$RUNNER
 
   Upload:
-    if: needs.Firmware.result = success
+    if: needs.Firmware.result == 'success'
     needs: [End-Firmware]
     runs-on: ubuntu-18.04
 

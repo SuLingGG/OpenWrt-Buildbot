@@ -29,7 +29,7 @@ jobs:
     runs-on: project-gdock
 
     outputs:
-      TOOCHAIN_LOOP: ${{ steps.init.outputs.TOOCHAIN_LOOP }}
+      LOOP: ${{ steps.init.outputs.LOOP }}
 
     steps:
       - name: Checkout
@@ -47,12 +47,12 @@ jobs:
           rm -rf openwrt.img
           fallocate -l 50G openwrt.img
           echo 'type=83' | sfdisk openwrt.img
-          export TOOCHAIN_LOOP="sudo losetup -f -P --show openwrt.img"
-          echo "TOOCHAIN_LOOP=$TOOCHAIN_LOOP" >> $GITHUB_ENV
-          echo "::set-output name=TOOCHAIN_LOOP::$(echo $TOOCHAIN_LOOP)"
-          sudo mkfs.ext4 ${TOOCHAIN_LOOP}p1
+          export LOOP="sudo losetup -f -P --show openwrt.img"
+          echo "LOOP=$LOOP" >> $GITHUB_ENV
+          echo "::set-output name=LOOP::$(echo $LOOP)"
+          sudo mkfs.ext4 ${LOOP}p1
           mkdir openwrt
-          sudo mount ${TOOCHAIN_LOOP}p1 openwrt
+          sudo mount ${LOOP}p1 openwrt
           sudo chown -R suling:suling openwrt
           cd openwrt
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
@@ -114,6 +114,28 @@ jobs:
           echo -e "$(nproc) threads compile"
           make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
 
+  End-Toolchain:
+    if: always()
+    needs: [Toolchain]
+    runs-on: project-gdock
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Restore Variables
+        run: |
+          echo "LOOP=$(echo '${{needs.Toolchain.outputs.LOOP}}')" >> $GITHUB_ENV
+
+      - name: Prepare Disk Image
+        if: always()
+        run: |
+          sync
+          sudo umount ${LOOP}p1 || true
+          sudo losetup -D || true
+          mkdir -p /data/disk/$RUNNER
+          mv openwrt.img /data/disk/$RUNNER
+
   Firmware:
     needs: [Toolchain]
     runs-on: project-gdock
@@ -122,7 +144,7 @@ jobs:
       TARGET: ${{ steps.compile.outputs.TARGET }}
       SUBTARGET: ${{ steps.compile.outputs.SUBTARGET }}
       GENERATE_STATUS: ${{ steps.generate.outputs.GENERATE_STATUS }}
-      FIEMWARE_LOOP: ${{ steps.init.outputs.FIEMWARE_LOOP }}
+      LOOP: ${{ steps.init.outputs.LOOP }}
 
     steps:
       - name: Checkout
@@ -132,11 +154,11 @@ jobs:
         id: init
         run: |
           mv /data/disk/$RUNNER/openwrt.img .
-          export FIEMWARE_LOOP="sudo losetup -f -P --show openwrt.img"
-          echo "FIEMWARE_LOOP=$FIEMWARE_LOOP" >> $GITHUB_ENV
-          echo "::set-output name=FIEMWARE_LOOP::$(echo $FIEMWARE_LOOP)"
+          export LOOP="sudo losetup -f -P --show openwrt.img"
+          echo "LOOP=$LOOP" >> $GITHUB_ENV
+          echo "::set-output name=LOOP::$(echo $LOOP)"
           mkdir openwrt
-          sudo mount ${FIEMWARE_LOOP}p1 openwrt
+          sudo mount ${LOOP}p1 openwrt
           sudo chown -R suling:suling openwrt
           cd openwrt
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
@@ -204,8 +226,9 @@ jobs:
           name: bin-archive
           path: openwrt/output
 
-  Prepare:
-    needs: [Toolchain, Firmware]
+  End-Firmware:
+    if: always()
+    needs: [Firmware]
     runs-on: project-gdock
 
     steps:
@@ -214,20 +237,19 @@ jobs:
 
       - name: Restore Variables
         run: |
-          echo "TOOCHAIN_LOOP=$(echo '${{needs.Toolchain.outputs.TOOCHAIN_LOOP}}')" >> $GITHUB_ENV
-          echo "FIEMWARE_LOOP=$(echo '${{needs.Firmware.outputs.FIEMWARE_LOOP}}')" >> $GITHUB_ENV
+          echo "LOOP=$(echo '${{needs.Firmware.outputs.LOOP}}')" >> $GITHUB_ENV
 
       - name: Prepare Disk Image
         if: always()
         run: |
           sync
-          sudo umount ${TOOCHAIN_LOOP}p1 || sudo umount ${TOOCHAIN_LOOP}p1 || true
+          sudo umount ${LOOP}p1 || true
           sudo losetup -D || true
           mkdir -p /data/disk/$RUNNER
           mv openwrt.img /data/disk/$RUNNER
 
   Upload:
-    needs: [Firmware]
+    needs: [End-Firmware]
     runs-on: ubuntu-18.04
 
     steps:

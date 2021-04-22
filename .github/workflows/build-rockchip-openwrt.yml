@@ -26,7 +26,7 @@ env:
 
 jobs:
   Toolchain:
-    runs-on: ${{ RUNNER }}
+    runs-on: project-r2s
     
     outputs:
       TOOLCHAIN_STATUS: ${{ steps.toolchain.outputs.TOOLCHAIN_STATUS }}
@@ -134,7 +134,7 @@ jobs:
   Firmware:
     if: needs.Toolchain.outputs.TOOLCHAIN_STATUS == 'success'
     needs: [Toolchain]
-    runs-on: ${{ RUNNER }}
+    runs-on: project-r2s
 
     outputs:
       PLATFORM: ${{ steps.compile.outputs.PLATFORM }}
@@ -222,7 +222,7 @@ jobs:
   Extra-Packages:
     if: needs.Firmware.outputs.GENERATE_STATUS == 'success'
     needs: [Firmware]
-    runs-on: ${{ RUNNER }}
+    runs-on: project-r2s
 
     outputs:
       COMPILE_STATUS: ${{ steps.compile.outputs.COMPILE_STATUS }}

@@ -305,9 +305,9 @@ jobs:
       - name: Restore Variables
         id: restore
         run: |
-          echo "PLATFORM=$(echo '${{needs.Build.outputs.PLATFORM}}')" >> $GITHUB_ENV
-          echo "TARGET=$(echo '${{needs.Build.outputs.TARGET}}')" >> $GITHUB_ENV
-          echo "SUBTARGET=$(echo '${{needs.Build.outputs.SUBTARGET}}')" >> $GITHUB_ENV
+          echo "PLATFORM=$(echo '${{needs.Firmware.outputs.PLATFORM}}')" >> $GITHUB_ENV
+          echo "TARGET=$(echo '${{needs.Firmware.outputs.TARGET}}')" >> $GITHUB_ENV
+          echo "SUBTARGET=$(echo '${{needs.Firmware.outputs.SUBTARGET}}')" >> $GITHUB_ENV
 
       - name: Download Bin Archive
         id: download

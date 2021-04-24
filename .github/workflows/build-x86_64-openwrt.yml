@@ -44,6 +44,8 @@ jobs:
           sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804)
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
+          sudo umount /dev/loop*p1 || true
+          sudo losetup -D || true
           rm -rf openwrt.img
           fallocate -l 150G openwrt.img
           echo 'type=83' | sfdisk openwrt.img
@@ -295,7 +297,7 @@ jobs:
 
   Upload:
     if: needs.Extra-Packages.outputs.COMPILE_STATUS == 'success'
-    needs: [Extra-Packages]
+    needs: [Extra-Packages, Firmware]
     runs-on: ubuntu-18.04
 
     steps:

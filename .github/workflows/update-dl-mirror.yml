@@ -21,6 +21,7 @@ env:
 
 jobs:
   Immortalwrt-1806:
+    if: always()
     runs-on: ubuntu-18.04
 
     steps:
@@ -85,6 +86,7 @@ jobs:
 
   Immortalwrt-Master:
     needs: [Immortalwrt-1806]
+    if: always()
     runs-on: ubuntu-18.04
 
     steps:
@@ -149,6 +151,7 @@ jobs:
 
   Lean-Master:
     needs: [Immortalwrt-Master]
+    if: always()
     runs-on: ubuntu-18.04
 
     steps:
@@ -213,6 +216,7 @@ jobs:
 
   OpenWrt-Master:
     needs: [Lean-Master]
+    if: always()
     runs-on: ubuntu-18.04
 
     steps:

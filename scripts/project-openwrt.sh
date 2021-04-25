@@ -60,6 +60,12 @@ pushd package/base-files/files/bin
 sed -i 's/ImmortalWrt/OpenWrt/g' config_generate
 popd
 
+# Use snapshots' bpftools
+pushd package/network/utils
+rm -rf bpftools
+svn co https://github.com/openwrt/openwrt/trunk/package/network/utils/bpftools
+popd
+
 # Fix SDK
 sed -i '/$(SDK_BUILD_DIR)\/$(STAGING_SUBDIR_HOST)\/usr\/bin/d;/LICENSE/d' target/sdk/Makefile
 

@@ -55,7 +55,7 @@ jobs:
           sudo mkfs.ext4 ${LOOP}p1
           mkdir openwrt
           sudo mount ${LOOP}p1 openwrt
-          lsblk -l | grep loop
+          lsblk -l
           sudo chown -R suling:suling openwrt
           cd openwrt
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
@@ -128,7 +128,7 @@ jobs:
           sync
           sudo umount ${LOOP}p1 || true
           sudo losetup -d $LOOP || true
-          lsblk -l | grep loop
+          lsblk -l
           mkdir -p /data/disk/$RUNNER
           mv openwrt.img /data/disk/$RUNNER
 
@@ -155,7 +155,7 @@ jobs:
           echo "::set-output name=LOOP::$(echo $LOOP)"
           mkdir openwrt
           sudo mount ${LOOP}p1 openwrt
-          lsblk -l | grep loop
+          lsblk -l
           sudo chown -R suling:suling openwrt
           cd openwrt
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
@@ -233,7 +233,7 @@ jobs:
           sync
           sudo umount ${LOOP}p1 || true
           sudo losetup -d $LOOP || true
-          lsblk -l | grep loop
+          lsblk -l
           mkdir -p /data/disk/$RUNNER
           mv openwrt.img /data/disk/$RUNNER
 

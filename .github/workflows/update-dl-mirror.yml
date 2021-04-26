@@ -81,7 +81,7 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
           bash -c "'mkdir -p $WEBROOT/dl/immortalwrt/openwrt-18.06'"
-          rsync -chav --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_DL $HOST:$DEST_DL
+          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_DL $HOST:$DEST_DL
           echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/immortalwrt/openwrt-18.06"
 
   Immortalwrt-Master:
@@ -146,7 +146,7 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
           bash -c "'mkdir -p $WEBROOT/dl/immortalwrt/master'"
-          rsync -chav --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_DL $HOST:$DEST_DL
+          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_DL $HOST:$DEST_DL
           echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/immortalwrt/master"
 
   Lean-Master:
@@ -211,7 +211,7 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
           bash -c "'mkdir -p $WEBROOT/dl/lede/master'"
-          rsync -chav --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_DL $HOST:$DEST_DL
+          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_DL $HOST:$DEST_DL
           echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/lede/master"
 
   OpenWrt-Master:
@@ -275,6 +275,6 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
           bash -c "'mkdir -p $WEBROOT/dl/openwrt/master'"
-          rsync -chav --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_DL $HOST:$DEST_DL
+          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_DL $HOST:$DEST_DL
           echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/openwrt/master"
 

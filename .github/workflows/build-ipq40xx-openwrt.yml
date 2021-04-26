@@ -32,6 +32,13 @@ jobs:
       TOOLCHAIN_STATUS: ${{ steps.toolchain.outputs.TOOLCHAIN_STATUS }}
 
     steps:
+      - name: Umount Missing Loop Devices
+        id: umount
+        run: |
+          sudo umount /dev/loop*p1 || true
+          sudo losetup -D || true
+          lsblk -l
+
       - name: Checkout
         uses: actions/checkout@main
 

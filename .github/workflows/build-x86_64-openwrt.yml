@@ -37,7 +37,7 @@ jobs:
         run: |
           sudo umount /dev/loop*p1 || true
           sudo losetup -D || true
-          lsblk -l
+          lsblk
 
       - name: Checkout
         uses: actions/checkout@main
@@ -62,7 +62,7 @@ jobs:
           sudo mkfs.ext4 ${LOOP}p1
           mkdir openwrt
           sudo mount ${LOOP}p1 openwrt
-          lsblk -l
+          lsblk
           sudo chown -R suling:suling openwrt
           cd openwrt
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
@@ -138,7 +138,7 @@ jobs:
           sync
           sudo umount ${LOOP}p1 || true
           sudo losetup -d $LOOP || true
-          lsblk -l
+          lsblk
           mkdir -p /data/disk/$RUNNER
           mv openwrt.img /data/disk/$RUNNER
 
@@ -166,7 +166,7 @@ jobs:
           echo "::set-output name=LOOP::$(echo $LOOP)"
           mkdir openwrt
           sudo mount ${LOOP}p1 openwrt
-          lsblk -l
+          lsblk
           sudo chown -R suling:suling openwrt
           cd openwrt
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
@@ -179,7 +179,7 @@ jobs:
           echo -e "$(nproc) threads compile"
           make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
           make diffconfig
-          make package/compile -j$(nproc) || make package/compile -j1 V=s
+          make package/compile -j$(nproc) || make package/compile -j$(nproc) || make package/compile -j1 V=s
           make package/index
           cd $OPENWRTROOT/bin/packages/*
           PLATFORM=$(basename `pwd`)
@@ -228,7 +228,7 @@ jobs:
           sync
           sudo umount ${LOOP}p1 || true
           sudo losetup -d $LOOP || true
-          lsblk -l
+          lsblk
           mkdir -p /data/disk/$RUNNER
           mv openwrt.img /data/disk/$RUNNER
 
@@ -260,7 +260,7 @@ jobs:
           echo "::set-output name=LOOP::$(echo $LOOP)"
           mkdir openwrt
           sudo mount ${LOOP}p1 openwrt
-          lsblk -l
+          lsblk
           sudo chown -R suling:suling openwrt
           cd openwrt
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
@@ -305,7 +305,7 @@ jobs:
           sync
           sudo umount ${LOOP}p1 || true
           sudo losetup -d $LOOP || true
-          lsblk -l
+          lsblk
           mkdir -p /data/disk/$RUNNER
           mv openwrt.img /data/disk/$RUNNER
 

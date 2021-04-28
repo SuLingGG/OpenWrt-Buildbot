@@ -217,6 +217,8 @@ jobs:
           make package/install -j1 V=s
           make target/install -j1 V=s
           make checksum
+          cd $FIRMWARE
+          gzip *esxi-flat.vmdk
           mkdir -p $OPENWRTROOT/output/bin/targets/$TARGET
           cp -r $FIRMWARE $OPENWRTROOT/output/bin/targets/$TARGET
           echo "::set-output name=GENERATE_STATUS::success"
@@ -278,7 +280,6 @@ jobs:
           make diffconfig
           make package/compile -j$(nproc) IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
           make package/index
-          gzip *esxi-flat.vmdk
           mkdir -p $OPENWRTROOT/output/bin/packages
           cp -r bin/packages/$PLATFORM $OPENWRTROOT/output/bin/packages
           echo "::set-output name=COMPILE_STATUS::success"

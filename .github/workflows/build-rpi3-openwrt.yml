@@ -343,7 +343,7 @@ jobs:
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
 
       - name: Deploy Files To Server
-        id: deploy
+        id: server
         env:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}"
           SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
@@ -368,4 +368,22 @@ jobs:
           rsync -axv --delete $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET && \
           rsync -axv --delete $WEBROOT/snapshots/packages/$PLATFORM $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/packages'"
           echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET"
+
+      - name: Deploy Files To OneDrive
+        id: onedrive
+        env:
+          SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}"
+          SOURCE_PACKAGES: "openwrt/bin/packages/${{ env.PLATFORM }}"
+          DEST_TARGETS: "snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}"
+          DEST_PACKAGES: "snapshots/packages/${{ env.PLATFORM }}"
+          UPLOADER_SECRETS: "${{secrets.UPLOADER_SECRETS}}"
+        if: env.UPLOADER_SECRETS != null
+        run: |
+          UPLOADER_URL=$(curl -sL https://api.github.com/repos/gaowanliang/LightUploader/releases/latest | grep /LightUploader_Linux_x86_64 | awk -F '"' '{print $4}')
+          sudo wget -q $UPLOADER_URL -O /usr/bin/lightuploader
+          sudo chmod +x /usr/bin/lightuploader
+          echo "${{secrets.UPLOADER_SECRETS}}" > uploader-config.json
+          lightuploader -c uploader-config.json -f $SOURCE_TARGETS -t 64 -b 20 -r $DEST_TARGETS
+          lightuploader -c uploader-config.json -f $SOURCE_PACKAGES -t 64 -b 20 -r $DEST_PACKAGES
+
 

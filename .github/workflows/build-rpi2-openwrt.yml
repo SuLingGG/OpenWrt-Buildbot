@@ -381,12 +381,14 @@ jobs:
         if: env.UPLOADER_SECRETS != null
         run: |
           UPLOADER_URL=$(curl -sL https://api.github.com/repos/gaowanliang/LightUploader/releases/latest | grep /LightUploader_Linux_x86_64 | awk -F '"' '{print $4}')
-          sudo wget -q $UPLOADER_URL -O lightuploader.tar.gz
+          wget -q $UPLOADER_URL -O lightuploader.tar.gz
+          wget -q https://raw.githubusercontent.com/gaowanliang/LightUploader/main/i18n/en.toml -O en-US.toml
           tar -zxvf lightuploader.tar.gz
-          sudo mv LightUploader /usr/bin/lightuploader
-          sudo chmod +x /usr/bin/lightuploader
-          echo "${{secrets.UPLOADER_SECRETS}}" > uploader-config.json
-          lightuploader -c uploader-config.json -f $SOURCE_TARGETS -t 64 -b 20 -r $DEST_TARGETS
-          lightuploader -c uploader-config.json -f $SOURCE_PACKAGES -t 64 -b 20 -r $DEST_PACKAGES
+          chmod +x LightUploader
+          cat << EOF > config.json
+          ${{ secrets.UPLOADER_SECRETS }}
+          EOF
+          ./LightUploader -c config.json -f $SOURCE_TARGETS -t 64 -b 20 -r $DEST_TARGETS
+          ./LightUploader -c config.json -f $SOURCE_PACKAGES -t 64 -b 20 -r $DEST_PACKAGES
 
 

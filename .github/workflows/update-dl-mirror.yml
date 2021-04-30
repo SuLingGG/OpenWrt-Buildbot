@@ -94,12 +94,13 @@ jobs:
         if: env.UPLOADER_SECRETS != null
         run: |
           UPLOADER_URL=$(curl -sL https://api.github.com/repos/gaowanliang/LightUploader/releases/latest | grep /LightUploader_Linux_x86_64 | awk -F '"' '{print $4}')
-          sudo wget -q $UPLOADER_URL -O lightuploader.tar.gz
+          wget -q $UPLOADER_URL -O lightuploader.tar.gz
+          wget -q https://raw.githubusercontent.com/gaowanliang/LightUploader/main/i18n/en.toml -O en-US.toml
           tar -zxvf lightuploader.tar.gz
-          sudo mv LightUploader /usr/bin/lightuploader
-          sudo chmod +x /usr/bin/lightuploader
-          echo "${{secrets.UPLOADER_SECRETS}}" > uploader-config.json
-          lightuploader -c uploader-config.json -f $SOURCE_DL -t 64 -b 20 -r $DEST_DL
+          cat << EOF > config.json
+          ${{ secrets.UPLOADER_SECRETS }}
+          EOF
+          ./LightUploader -c config.json -f $SOURCE_DL -t 10 -b 20 -r $DEST_DL
 
   Immortalwrt-Master:
     needs: [Immortalwrt-1806]
@@ -171,17 +172,18 @@ jobs:
         id: onedrive
         env:
           SOURCE_DL: "openwrt/dl"
-          DEST_DL: "dl/immortalwrt/master"
+          DEST_DL: "dl/immortalwrt/openwrt-18.06"
           UPLOADER_SECRETS: "${{secrets.UPLOADER_SECRETS}}"
         if: env.UPLOADER_SECRETS != null
         run: |
           UPLOADER_URL=$(curl -sL https://api.github.com/repos/gaowanliang/LightUploader/releases/latest | grep /LightUploader_Linux_x86_64 | awk -F '"' '{print $4}')
-          sudo wget -q $UPLOADER_URL -O lightuploader.tar.gz
+          wget -q $UPLOADER_URL -O lightuploader.tar.gz
+          wget -q https://raw.githubusercontent.com/gaowanliang/LightUploader/main/i18n/en.toml -O en-US.toml
           tar -zxvf lightuploader.tar.gz
-          sudo mv LightUploader /usr/bin/lightuploader
-          sudo chmod +x /usr/bin/lightuploader
-          echo "${{secrets.UPLOADER_SECRETS}}" > uploader-config.json
-          lightuploader -c uploader-config.json -f $SOURCE_DL -t 64 -b 20 -r $DEST_DL
+          cat << EOF > config.json
+          ${{ secrets.UPLOADER_SECRETS }}
+          EOF
+          ./LightUploader -c config.json -f $SOURCE_DL -t 10 -b 20 -r $DEST_DL
 
   Lean-Master:
     needs: [Immortalwrt-Master]
@@ -252,18 +254,19 @@ jobs:
       - name: Deploy Files To OneDrive
         id: onedrive
         env:
-          SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "dl/lede/master"
+          SOURCE_DL: "openwrt/dl"
+          DEST_DL: "dl/immortalwrt/openwrt-18.06"
           UPLOADER_SECRETS: "${{secrets.UPLOADER_SECRETS}}"
         if: env.UPLOADER_SECRETS != null
         run: |
           UPLOADER_URL=$(curl -sL https://api.github.com/repos/gaowanliang/LightUploader/releases/latest | grep /LightUploader_Linux_x86_64 | awk -F '"' '{print $4}')
-          sudo wget -q $UPLOADER_URL -O lightuploader.tar.gz
+          wget -q $UPLOADER_URL -O lightuploader.tar.gz
+          wget -q https://raw.githubusercontent.com/gaowanliang/LightUploader/main/i18n/en.toml -O en-US.toml
           tar -zxvf lightuploader.tar.gz
-          sudo mv LightUploader /usr/bin/lightuploader
-          sudo chmod +x /usr/bin/lightuploader
-          echo "${{secrets.UPLOADER_SECRETS}}" > uploader-config.json
-          lightuploader -c uploader-config.json -f $SOURCE_DL -t 64 -b 20 -r $DEST_DL
+          cat << EOF > config.json
+          ${{ secrets.UPLOADER_SECRETS }}
+          EOF
+          ./LightUploader -c config.json -f $SOURCE_DL -t 10 -b 20 -r $DEST_DL
 
   OpenWrt-Master:
     needs: [Lean-Master]
@@ -333,15 +336,17 @@ jobs:
       - name: Deploy Files To OneDrive
         id: onedrive
         env:
-          SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "dl/openwrt/master/"
+          SOURCE_DL: "openwrt/dl"
+          DEST_DL: "dl/immortalwrt/openwrt-18.06"
           UPLOADER_SECRETS: "${{secrets.UPLOADER_SECRETS}}"
         if: env.UPLOADER_SECRETS != null
         run: |
           UPLOADER_URL=$(curl -sL https://api.github.com/repos/gaowanliang/LightUploader/releases/latest | grep /LightUploader_Linux_x86_64 | awk -F '"' '{print $4}')
-          sudo wget -q $UPLOADER_URL -O lightuploader.tar.gz
+          wget -q $UPLOADER_URL -O lightuploader.tar.gz
+          wget -q https://raw.githubusercontent.com/gaowanliang/LightUploader/main/i18n/en.toml -O en-US.toml
           tar -zxvf lightuploader.tar.gz
-          sudo mv LightUploader /usr/bin/lightuploader
-          sudo chmod +x /usr/bin/lightuploader
-          echo "${{secrets.UPLOADER_SECRETS}}" > uploader-config.json
-          lightuploader -c uploader-config.json -f $SOURCE_DL -t 64 -b 20 -r $DEST_DL
+          chmod +x LightUploader
+          cat << EOF > config.json
+          ${{ secrets.UPLOADER_SECRETS }}
+          EOF
+          ./LightUploader -c config.json -f $SOURCE_DL -t 10 -b 20 -r $DEST_DL

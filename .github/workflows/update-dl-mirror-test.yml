@@ -78,6 +78,7 @@ jobs:
           wget -q $UPLOADER_URL -O lightuploader.tar.gz
           wget -q https://raw.githubusercontent.com/gaowanliang/LightUploader/main/i18n/en.toml -O en-US.toml
           tar -zxvf lightuploader.tar.gz
+          chmod +x LightUploader
           cat << EOF > config.json
           ${{ secrets.UPLOADER_SECRETS }}
           EOF

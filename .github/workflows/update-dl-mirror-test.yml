@@ -62,7 +62,7 @@ jobs:
           wget -q https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
           echo "CONFIG_ALL=y" >> .config
           make defconfig
-          make download -j128
+          make download -j16
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
           echo "::set-output name=DOWNLOAD_STATUS::success"
@@ -76,11 +76,10 @@ jobs:
         if: env.UPLOADER_SECRETS != null
         run: |
           UPLOADER_URL=$(curl -sL https://api.github.com/repos/gaowanliang/LightUploader/releases/latest | grep /LightUploader_Linux_x86_64 | awk -F '"' '{print $4}')
-          sudo wget -q $UPLOADER_URL -O lightuploader.tar.gz
+          wget -q $UPLOADER_URL -O lightuploader.tar.gz
+          wget -q https://raw.githubusercontent.com/gaowanliang/LightUploader/main/i18n/en.toml -O en-US.toml
           tar -zxvf lightuploader.tar.gz
-          sudo mv LightUploader /usr/bin
-          sudo chmod +x /usr/bin/LightUploader
           cat << EOF > config.json
           ${{ secrets.UPLOADER_SECRETS }}
           EOF
-          LightUploader -c config.json -f $SOURCE_DL -t 10 -b 20 -r $DEST_DL
+          ./LightUploader -c config.json -f $SOURCE_DL -t 10 -b 20 -r $DEST_DL

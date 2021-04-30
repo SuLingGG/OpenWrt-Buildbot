@@ -60,9 +60,8 @@ jobs:
         run: |
           cd $OPENWRTROOT
           wget -q https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
-          echo "CONFIG_ALL=y" >> .config
           make defconfig
-          make download -j16
+          make download -j128
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
           echo "::set-output name=DOWNLOAD_STATUS::success"
@@ -88,15 +87,16 @@ jobs:
       - name: Deploy Files To OneDrive
         id: onedrive
         env:
-          SOURCE_DL: "openwrt/dl"
+          SOURCE_DL: "dl"
           DEST_DL: "dl/immortalwrt/openwrt-18.06"
           UPLOADER_SECRETS: "${{secrets.UPLOADER_SECRETS}}"
         if: env.UPLOADER_SECRETS != null
         run: |
+          cd openwrt
           UPLOADER_URL=$(curl -sL https://api.github.com/repos/gaowanliang/LightUploader/releases/latest | grep /LightUploader_Linux_x86_64 | awk -F '"' '{print $4}')
           sudo wget -q $UPLOADER_URL -O lightuploader.tar.gz
           tar -zxvf lightuploader.tar.gz
-          sudo mv LightUploader /usr/bin/lightuploader
-          sudo chmod +x /usr/bin/lightuploader
-          echo "${{secrets.UPLOADER_SECRETS}}" > ./config.json
-          lightuploader -c ./config.json -f $SOURCE_DL -t 10 -b 20 -r $DEST_DL
+          sudo mv LightUploader /usr/bin
+          sudo chmod +x /usr/bin/LightUploader
+          echo "${{secrets.UPLOADER_SECRETS}}" >> ./config.json
+          LightUploader -c ./config.json -f $SOURCE_DL -t 10 -b 20 -r $DEST_DL

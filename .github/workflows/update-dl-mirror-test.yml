@@ -60,7 +60,6 @@ jobs:
         run: |
           cd $OPENWRTROOT
           wget -q https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
-          echo "CONFIG_ALL=y" >> .config
           make defconfig
           make download -j16
           find dl -size -1024c -exec ls -l {} \;

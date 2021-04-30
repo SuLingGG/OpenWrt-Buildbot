@@ -6,7 +6,7 @@
 # Blog: https://p3terx.com
 #=================================================
 
-name: Update OpenWrt.cc DL Mirror
+name: Update OpenWrt.cc DL Mirror Test
 
 on:
   repository_dispatch:
@@ -98,5 +98,5 @@ jobs:
           tar -zxvf lightuploader.tar.gz
           sudo mv LightUploader /usr/bin/lightuploader
           sudo chmod +x /usr/bin/lightuploader
-          echo "${{secrets.UPLOADER_SECRETS}}" > uploader-config.json
-          lightuploader -c uploader-config.json -f $SOURCE_DL -t 64 -b 20 -r $DEST_DL
+          echo "${{secrets.UPLOADER_SECRETS}}" > ./config.json
+          lightuploader -c ./config.json -f $SOURCE_DL -t 10 -b 20 -r $DEST_DL

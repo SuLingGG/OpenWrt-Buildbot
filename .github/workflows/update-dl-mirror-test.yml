@@ -60,43 +60,27 @@ jobs:
         run: |
           cd $OPENWRTROOT
           wget -q https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
+          echo "CONFIG_ALL=y" >> .config
           make defconfig
           make download -j128
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
           echo "::set-output name=DOWNLOAD_STATUS::success"
 
-      - name: Deploy Files To Server
-        id: server
-        env:
-          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}"
-          SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
-          REMOTE_PRIVATEKEY: "${{secrets.REMOTE_PRIVATEKEY}}"
-        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
-        run: |
-          mkdir -p ~/.ssh/
-          install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $WEBROOT/dl/immortalwrt/openwrt-18.06'"
-          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_DL $HOST:$DEST_DL
-          echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/immortalwrt/openwrt-18.06"
-
       - name: Deploy Files To OneDrive
         id: onedrive
         env:
-          SOURCE_DL: "dl"
+          SOURCE_DL: "openwrt/dl"
           DEST_DL: "dl/immortalwrt/openwrt-18.06"
           UPLOADER_SECRETS: "${{secrets.UPLOADER_SECRETS}}"
         if: env.UPLOADER_SECRETS != null
         run: |
-          cd openwrt
           UPLOADER_URL=$(curl -sL https://api.github.com/repos/gaowanliang/LightUploader/releases/latest | grep /LightUploader_Linux_x86_64 | awk -F '"' '{print $4}')
           sudo wget -q $UPLOADER_URL -O lightuploader.tar.gz
           tar -zxvf lightuploader.tar.gz
           sudo mv LightUploader /usr/bin
           sudo chmod +x /usr/bin/LightUploader
-          echo "${{secrets.UPLOADER_SECRETS}}" >> ./config.json
-          LightUploader -c ./config.json -f $SOURCE_DL -t 10 -b 20 -r $DEST_DL
+          cat << EOF > config.json
+          ${{ secrets.UPLOADER_SECRETS }}
+          EOF
+          LightUploader -c config.json -f $SOURCE_DL -t 10 -b 20 -r $DEST_DL

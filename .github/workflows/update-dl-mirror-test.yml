@@ -66,12 +66,12 @@ jobs:
           find dl -size -1024c -exec rm -f {} \;
           echo "::set-output name=DOWNLOAD_STATUS::success"
 
-      - name: Rclone Upload
+      - name: Deploy Files To OneDrive
         env:
-          RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
+          RCLONE_NAME: ${{ secrets.RCLONE_NAME }}
           SOURCE_DL: "openwrt/dl"
           DEST_DL: "dl/immortalwrt/openwrt-18.06"
-        if: env.RCLONE_CONFIG != null
+        if: env.RCLONE_NAME != null
         run: |
           curl https://rclone.org/install.sh | sudo bash
           mkdir -p ~/.config/rclone/

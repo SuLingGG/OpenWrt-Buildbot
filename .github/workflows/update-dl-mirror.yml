@@ -85,12 +85,12 @@ jobs:
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_DL $HOST:$DEST_DL
           echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/immortalwrt/openwrt-18.06"
 
-      - name: Rclone Upload
+      - name: Deploy Files To OneDrive
         env:
-          RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
+          RCLONE_NAME: ${{ secrets.RCLONE_NAME }}
           SOURCE_DL: "openwrt/dl"
           DEST_DL: "/dl/immortalwrt/openwrt-18.06"
-        if: env.RCLONE_CONFIG != null
+        if: env.RCLONE_NAME != null
         run: |
           curl https://rclone.org/install.sh | sudo bash
           mkdir -p ~/.config/rclone/
@@ -165,12 +165,12 @@ jobs:
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_DL $HOST:$DEST_DL
           echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/immortalwrt/master"
 
-      - name: Rclone Upload
+      - name: Deploy Files To OneDrive
         env:
-          RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
+          RCLONE_NAME: ${{ secrets.RCLONE_NAME }}
           SOURCE_DL: "openwrt/dl"
           DEST_DL: "/dl/immortalwrt/master"
-        if: env.RCLONE_CONFIG != null
+        if: env.RCLONE_NAME != null
         run: |
           curl https://rclone.org/install.sh | sudo bash
           mkdir -p ~/.config/rclone/
@@ -245,12 +245,12 @@ jobs:
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_DL $HOST:$DEST_DL
           echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/lede/master"
 
-      - name: Rclone Upload
+      - name: Deploy Files To OneDrive
         env:
-          RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
+          RCLONE_NAME: ${{ secrets.RCLONE_NAME }}
           SOURCE_DL: "openwrt/dl"
           DEST_DL: "/dl/lede/master"
-        if: env.RCLONE_CONFIG != null
+        if: env.RCLONE_NAME != null
         run: |
           curl https://rclone.org/install.sh | sudo bash
           mkdir -p ~/.config/rclone/
@@ -324,12 +324,12 @@ jobs:
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_DL $HOST:$DEST_DL
           echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/openwrt/master"
 
-      - name: Rclone Upload
+      - name: Deploy Files To OneDrive
         env:
-          RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
+          RCLONE_NAME: ${{ secrets.RCLONE_NAME }}
           SOURCE_DL: "openwrt/dl"
           DEST_DL: "/dl/openwrt/master"
-        if: env.RCLONE_CONFIG != null
+        if: env.RCLONE_NAME != null
         run: |
           curl https://rclone.org/install.sh | sudo bash
           mkdir -p ~/.config/rclone/

@@ -299,12 +299,12 @@ jobs:
           rsync -axv --delete $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET'"
           echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET"
 
-      - name: Rclone Upload
+      - name: Deploy Files To OneDrive
         env:
-          RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
+          RCLONE_NAME: ${{ secrets.RCLONE_NAME }}
           SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}"
           DEST_TARGETS: "/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}"
-        if: env.RCLONE_CONFIG != null
+        if: env.RCLONE_NAME != null
         run: |
           curl https://rclone.org/install.sh | sudo bash
           mkdir -p ~/.config/rclone/

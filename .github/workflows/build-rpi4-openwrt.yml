@@ -371,24 +371,19 @@ jobs:
           rsync -axv --delete $WEBROOT/snapshots/packages/$PLATFORM $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/packages'"
           echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET"
 
-      - name: Deploy Files To OneDrive
-        id: onedrive
+      - name: Rclone Upload
         env:
+          RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
           SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}"
-          SOURCE_PACKAGES: "openwrt/bin/packages/${{ env.PLATFORM }}"
-          DEST_TARGETS: "snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}"
-          DEST_PACKAGES: "snapshots/packages/${{ env.PLATFORM }}"
-          UPLOADER_SECRETS: "${{secrets.UPLOADER_SECRETS}}"
-        if: env.UPLOADER_SECRETS != null
+          SOURCE_PACKAGES: "openwrt/bin/packages/${{ env.PLATFORM }}/"
+          DEST_TARGETS: "/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}"
+          DEST_PACKAGES: "/snapshots/packages/${{ env.PLATFORM }}/"
+        if: env.RCLONE_CONFIG != null
         run: |
-          UPLOADER_URL=$(curl -sL https://api.github.com/repos/gaowanliang/LightUploader/releases/latest | grep /LightUploader_Linux_x86_64 | awk -F '"' '{print $4}')
-          wget -q $UPLOADER_URL -O lightuploader.tar.gz
-          wget -q https://raw.githubusercontent.com/gaowanliang/LightUploader/main/i18n/en.toml -O en-US.toml
-          tar -zxvf lightuploader.tar.gz
-          chmod +x LightUploader
-          cat << EOF > config.json
-          ${{ secrets.UPLOADER_SECRETS }}
+          curl https://rclone.org/install.sh | sudo bash
+          mkdir -p ~/.config/rclone/
+          cat << EOF > ~/.config/rclone/rclone.conf
+          ${{ secrets.RCLONE_CONFIG }}
           EOF
-          ./LightUploader -c config.json -f $SOURCE_TARGETS -t 64 -b 20 -r $DEST_TARGETS
-          ./LightUploader -c config.json -f $SOURCE_PACKAGES -t 64 -b 20 -r $DEST_PACKAGES
-
+          rclone copy $SOURCE_TARGETS ${{ secrets.RCLONE_NAME }}:$DEST_TARGETS --transfers=16
+          rclone copy $SOURCE_PACKAGES ${{ secrets.RCLONE_NAME }}:$DEST_PACKAGES --transfers=16

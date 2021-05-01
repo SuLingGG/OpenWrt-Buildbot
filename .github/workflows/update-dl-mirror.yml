@@ -85,23 +85,19 @@ jobs:
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_DL $HOST:$DEST_DL
           echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/immortalwrt/openwrt-18.06"
 
-      - name: Deploy Files To OneDrive
-        id: onedrive
+      - name: Rclone Upload
         env:
+          RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
           SOURCE_DL: "openwrt/dl"
-          DEST_DL: "dl/immortalwrt/openwrt-18.06"
-          UPLOADER_SECRETS: "${{secrets.UPLOADER_SECRETS}}"
-        if: env.UPLOADER_SECRETS != null
+          DEST_DL: "/dl/immortalwrt/openwrt-18.06"
+        if: env.RCLONE_CONFIG != null
         run: |
-          UPLOADER_URL=$(curl -sL https://api.github.com/repos/gaowanliang/LightUploader/releases/latest | grep /LightUploader_Linux_x86_64 | awk -F '"' '{print $4}')
-          wget -q $UPLOADER_URL -O lightuploader.tar.gz
-          wget -q https://raw.githubusercontent.com/gaowanliang/LightUploader/main/i18n/en.toml -O en-US.toml
-          tar -zxvf lightuploader.tar.gz
-          chmod +x LightUploader
-          cat << EOF > config.json
-          ${{ secrets.UPLOADER_SECRETS }}
+          curl https://rclone.org/install.sh | sudo bash
+          mkdir -p ~/.config/rclone/
+          cat << EOF > ~/.config/rclone/rclone.conf
+          ${{ secrets.RCLONE_CONFIG }}
           EOF
-          ./LightUploader -c config.json -f $SOURCE_DL -t 10 -b 20 -r $DEST_DL
+          rclone copy $SOURCE_DL ${{ secrets.RCLONE_NAME }}:$DEST_DL --transfers=16
 
   Immortalwrt-Master:
     needs: [Immortalwrt-1806]
@@ -169,23 +165,19 @@ jobs:
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_DL $HOST:$DEST_DL
           echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/immortalwrt/master"
 
-      - name: Deploy Files To OneDrive
-        id: onedrive
+      - name: Rclone Upload
         env:
+          RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
           SOURCE_DL: "openwrt/dl"
-          DEST_DL: "dl/immortalwrt/openwrt-18.06"
-          UPLOADER_SECRETS: "${{secrets.UPLOADER_SECRETS}}"
-        if: env.UPLOADER_SECRETS != null
+          DEST_DL: "/dl/immortalwrt/master"
+        if: env.RCLONE_CONFIG != null
         run: |
-          UPLOADER_URL=$(curl -sL https://api.github.com/repos/gaowanliang/LightUploader/releases/latest | grep /LightUploader_Linux_x86_64 | awk -F '"' '{print $4}')
-          wget -q $UPLOADER_URL -O lightuploader.tar.gz
-          wget -q https://raw.githubusercontent.com/gaowanliang/LightUploader/main/i18n/en.toml -O en-US.toml
-          tar -zxvf lightuploader.tar.gz
-          chmod +x LightUploader
-          cat << EOF > config.json
-          ${{ secrets.UPLOADER_SECRETS }}
+          curl https://rclone.org/install.sh | sudo bash
+          mkdir -p ~/.config/rclone/
+          cat << EOF > ~/.config/rclone/rclone.conf
+          ${{ secrets.RCLONE_CONFIG }}
           EOF
-          ./LightUploader -c config.json -f $SOURCE_DL -t 10 -b 20 -r $DEST_DL
+          rclone copy $SOURCE_DL ${{ secrets.RCLONE_NAME }}:$DEST_DL --transfers=16
 
   Lean-Master:
     needs: [Immortalwrt-Master]
@@ -253,23 +245,19 @@ jobs:
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_DL $HOST:$DEST_DL
           echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/lede/master"
 
-      - name: Deploy Files To OneDrive
-        id: onedrive
+      - name: Rclone Upload
         env:
+          RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
           SOURCE_DL: "openwrt/dl"
-          DEST_DL: "dl/immortalwrt/openwrt-18.06"
-          UPLOADER_SECRETS: "${{secrets.UPLOADER_SECRETS}}"
-        if: env.UPLOADER_SECRETS != null
+          DEST_DL: "/dl/lede/master"
+        if: env.RCLONE_CONFIG != null
         run: |
-          UPLOADER_URL=$(curl -sL https://api.github.com/repos/gaowanliang/LightUploader/releases/latest | grep /LightUploader_Linux_x86_64 | awk -F '"' '{print $4}')
-          wget -q $UPLOADER_URL -O lightuploader.tar.gz
-          wget -q https://raw.githubusercontent.com/gaowanliang/LightUploader/main/i18n/en.toml -O en-US.toml
-          tar -zxvf lightuploader.tar.gz
-          chmod +x LightUploader
-          cat << EOF > config.json
-          ${{ secrets.UPLOADER_SECRETS }}
+          curl https://rclone.org/install.sh | sudo bash
+          mkdir -p ~/.config/rclone/
+          cat << EOF > ~/.config/rclone/rclone.conf
+          ${{ secrets.RCLONE_CONFIG }}
           EOF
-          ./LightUploader -c config.json -f $SOURCE_DL -t 10 -b 20 -r $DEST_DL
+          rclone copy $SOURCE_DL ${{ secrets.RCLONE_NAME }}:$DEST_DL --transfers=16
 
   OpenWrt-Master:
     needs: [Lean-Master]
@@ -336,20 +324,16 @@ jobs:
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_DL $HOST:$DEST_DL
           echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/openwrt/master"
 
-      - name: Deploy Files To OneDrive
-        id: onedrive
+      - name: Rclone Upload
         env:
+          RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
           SOURCE_DL: "openwrt/dl"
-          DEST_DL: "dl/immortalwrt/openwrt-18.06"
-          UPLOADER_SECRETS: "${{secrets.UPLOADER_SECRETS}}"
-        if: env.UPLOADER_SECRETS != null
+          DEST_DL: "/dl/openwrt/master"
+        if: env.RCLONE_CONFIG != null
         run: |
-          UPLOADER_URL=$(curl -sL https://api.github.com/repos/gaowanliang/LightUploader/releases/latest | grep /LightUploader_Linux_x86_64 | awk -F '"' '{print $4}')
-          wget -q $UPLOADER_URL -O lightuploader.tar.gz
-          wget -q https://raw.githubusercontent.com/gaowanliang/LightUploader/main/i18n/en.toml -O en-US.toml
-          tar -zxvf lightuploader.tar.gz
-          chmod +x LightUploader
-          cat << EOF > config.json
-          ${{ secrets.UPLOADER_SECRETS }}
+          curl https://rclone.org/install.sh | sudo bash
+          mkdir -p ~/.config/rclone/
+          cat << EOF > ~/.config/rclone/rclone.conf
+          ${{ secrets.RCLONE_CONFIG }}
           EOF
-          ./LightUploader -c config.json -f $SOURCE_DL -t 10 -b 20 -r $DEST_DL
+          rclone copy $SOURCE_DL ${{ secrets.RCLONE_NAME }}:$DEST_DL --transfers=16

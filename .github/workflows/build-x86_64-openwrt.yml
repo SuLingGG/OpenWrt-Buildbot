@@ -131,6 +131,22 @@ jobs:
           make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
           echo "::set-output name=TOOLCHAIN_STATUS::success"
 
+      - name: Collect Logs
+        id: toolchain-logs-collect
+        if: always()
+        run: |
+          cd $OPENWRTROOT
+          mkdir output/logs
+          mv logs output/logs/${{ github.job }}
+
+      - name: Upload Logs
+        id: toolchain-logs-upload
+        if: always()
+        uses: actions/upload-artifact@main
+        with:
+          name: Logs-${{ github.job }}
+          path: openwrt/output/logs/${{ github.job }}
+
       - name: Prepare Disk Image
         id: prepare
         if: always()
@@ -223,6 +239,21 @@ jobs:
           cp -r $FIRMWARE $OPENWRTROOT/output/bin/targets/$TARGET
           echo "::set-output name=GENERATE_STATUS::success"
 
+      - name: Collect Logs
+        id: firmware-logs-collect
+        if: always()
+        run: |
+          cd $OPENWRTROOT
+          mv logs output/logs/${{ github.job }}
+
+      - name: Upload Logs
+        id: firmware-logs-upload
+        if: always()
+        uses: actions/upload-artifact@main
+        with:
+          name: Logs-${{ github.job }}
+          path: openwrt/output/logs/${{ github.job }}
+
       - name: Prepare Disk Image
         if: always()
         id: prepare
@@ -284,6 +315,14 @@ jobs:
           cp -r bin/packages/$PLATFORM $OPENWRTROOT/output/bin/packages
           echo "::set-output name=COMPILE_STATUS::success"
 
+      - name: Collect Logs
+        id: packages-logs-collect
+        if: always()
+        run: |
+          cd $OPENWRTROOT
+          mv logs output/logs/${{ github.job }}
+          cp -r output/logs output/bin/targets/$TARGET/$SUBTARGET
+
       - name: Compress Bin Folder
         if: steps.compile.outputs.COMPILE_STATUS == 'success'
         id: compress
@@ -298,6 +337,14 @@ jobs:
         with:
           name: bin-archive
           path: openwrt/output
+
+      - name: Upload Logs
+        id: packages-logs-upload
+        if: always()
+        uses: actions/upload-artifact@main
+        with:
+          name: Logs-${{ github.job }}
+          path: openwrt/output/logs/${{ github.job }}
 
       - name: Prepare Disk Image
         if: always()

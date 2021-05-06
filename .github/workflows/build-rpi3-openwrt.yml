@@ -303,7 +303,6 @@ jobs:
           rm -f .config*
           cp ../$CONFIG_FILE ./.config
           cat ../config/packages-extra.config >> $OPENWRTROOT/.config
-          cat ../config/docker-support.config >> $OPENWRTROOT/.config
           make defconfig
           make diffconfig
           make package/compile -j$(nproc) BUILD_LOG=1 IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"

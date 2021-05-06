@@ -80,8 +80,7 @@ jobs:
         id: update
         run: |
           cd $OPENWRTROOT
-          chmod +x ../scripts/*.sh
-          ../scripts/revert-docker.sh
+          ./scripts/feeds update -a
 
       - name: Install Feeds
         id: install
@@ -93,6 +92,7 @@ jobs:
         run: |
           [ -e files ] && mv files $OPENWRTROOT/files
           cd $OPENWRTROOT
+          chmod +x ../scripts/*.sh
           ../$DIY_SH
           ../scripts/preset-clash-core.sh armv8
           ../scripts/preset-terminal-tools.sh
@@ -118,7 +118,6 @@ jobs:
           rm -f $OPENWRTROOT/.config*
           cp $CONFIG_FILE $OPENWRTROOT/.config
           cat config/firmware-extra.config >> $OPENWRTROOT/.config
-          cat config/docker-support.config >> $OPENWRTROOT/.config
           cd $OPENWRTROOT
           make defconfig
           echo -e "$(nproc) threads compile"

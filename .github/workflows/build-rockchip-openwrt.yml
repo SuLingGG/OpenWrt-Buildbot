@@ -106,7 +106,7 @@ jobs:
           echo "CONFIG_ALL=y" >> .config
           make defconfig
           echo -e "$(nproc) threads download"
-          make download -j$(nproc)
+          make download -j16
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
@@ -121,14 +121,14 @@ jobs:
           cd $OPENWRTROOT
           make defconfig
           echo -e "$(nproc) threads compile"
-          make tools/install -j$(nproc) || make tools/install -j1 V=s
+          make tools/install -j$(nproc) BUILD_LOG=1 || make tools/install -j1 V=s
 
       - name: Compile Toolchain
         id: toolchain
         run: |
           cd $OPENWRTROOT
           echo -e "$(nproc) threads compile"
-          make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
+          make toolchain/compile -j$(nproc) BUILD_LOG=1 || make toolchain/compile -j1 V=s
           echo "::set-output name=TOOLCHAIN_STATUS::success"
 
       - name: Collect Logs
@@ -136,7 +136,7 @@ jobs:
         if: always()
         run: |
           cd $OPENWRTROOT
-          mkdir output/logs
+          mkdir -p output/logs
           mv logs output/logs/${{ github.job }}
 
       - name: Upload Logs
@@ -193,9 +193,9 @@ jobs:
         run: |
           cd $OPENWRTROOT
           echo -e "$(nproc) threads compile"
-          make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
+          make target/compile -j$(nproc) BUILD_LOG=1 || make target/compile -j1 V=s IGNORE_ERRORS=1
           make diffconfig
-          make package/compile -j$(nproc) || make package/compile -j$(nproc) || make package/compile -j1 V=s
+          make package/compile -j$(nproc) BUILD_LOG=1 || make package/compile -j1 V=s
           make package/index
           cd $OPENWRTROOT/bin/packages/*
           PLATFORM=$(basename `pwd`)
@@ -230,8 +230,8 @@ jobs:
           cp ../scripts/init-settings.sh files/etc/uci-defaults/99-init-settings
           mkdir -p files/bin
           cp ../scripts/ipv6-helper.sh files/bin/ipv6-helper
-          make package/install -j1 V=s
-          make target/install -j1 V=s
+          make package/install || make package/install -j1 V=s
+          make target/install || make target/install -j1 V=s
           make checksum
           mkdir -p $OPENWRTROOT/output/bin/targets/$TARGET
           cp -r $FIRMWARE $OPENWRTROOT/output/bin/targets/$TARGET
@@ -307,7 +307,7 @@ jobs:
           cat ../config/docker-support.config >> $OPENWRTROOT/.config
           make defconfig
           make diffconfig
-          make package/compile -j$(nproc) IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
+          make package/compile -j$(nproc) BUILD_LOG=1 IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
           make package/index
           mkdir -p $OPENWRTROOT/output/bin/packages
           cp -r bin/packages/$PLATFORM $OPENWRTROOT/output/bin/packages

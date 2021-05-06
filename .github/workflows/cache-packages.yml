@@ -60,8 +60,7 @@ jobs:
           wget -q https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
           echo "CONFIG_ALL=y" >> .config
           make defconfig
-          echo -e "$(nproc) threads download"
-          make download -j$(nproc)
+          make download -j16
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
           mkdir -p /data/cache

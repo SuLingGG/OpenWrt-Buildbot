@@ -139,7 +139,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@main
         with:
-          name: Logs_${{ github.job }}
+          name: Logs-${{ github.job }}
           path: openwrt/output/logs/${{ github.job }}
 
       - name: Prepare Disk Image
@@ -252,7 +252,7 @@ jobs:
         if: steps.generate.outputs.GENERATE_STATUS == 'success'
         id: upload
         with:
-          name: Bin_Archive
+          name: Bin-Archive
           path: openwrt/output
 
       - name: Upload Logs
@@ -260,7 +260,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@main
         with:
-          name: Logs_${{ github.job }}
+          name: Logs-${{ github.job }}
           path: openwrt/output/logs/${{ github.job }}
 
       - name: Prepare Disk Image
@@ -294,7 +294,7 @@ jobs:
         id: download
         uses: actions/download-artifact@v2
         with:
-          name: Bin_Archive
+          name: Bin-Archive
           path: openwrt
 
       - name: Decompress Bin Folder

@@ -143,7 +143,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@main
         with:
-          name: Logs-${{ github.job }}
+          name: Logs_${{ github.job }}
           path: openwrt/output/logs/${{ github.job }}
 
       - name: Prepare Disk Image
@@ -250,7 +250,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@main
         with:
-          name: Logs-${{ github.job }}
+          name: Logs_${{ github.job }}
           path: openwrt/output/logs/${{ github.job }}
 
       - name: Prepare Disk Image
@@ -333,7 +333,7 @@ jobs:
         id: upload
         uses: actions/upload-artifact@main
         with:
-          name: bin-archive
+          name: Bin_Archive
           path: openwrt/output
 
       - name: Upload Logs
@@ -341,7 +341,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@main
         with:
-          name: Logs-${{ github.job }}
+          name: Logs_${{ github.job }}
           path: openwrt/output/logs/${{ github.job }}
 
       - name: Prepare Disk Image
@@ -375,7 +375,7 @@ jobs:
         id: download
         uses: actions/download-artifact@v2
         with:
-          name: bin-archive
+          name: Bin_Archive
           path: openwrt
 
       - name: Decompress Bin Folder
@@ -405,13 +405,12 @@ jobs:
           echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET \
-          $WEBROOT/snapshots/packages/$PLATFORM'"
-          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
-          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
-          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET && \
-          mkdir -p $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/packages && \
-          rsync -axv --delete $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET && \
-          rsync -axv --delete $WEBROOT/snapshots/packages/$PLATFORM $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/packages'"
+          bash -c "mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET \
+          $WEBROOT/snapshots/packages/$PLATFORM"
+          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_TARGETS $HOST:$DEST_TARGETS
+          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
+          bash -c "mkdir -p $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET && \
+          mkdir -p $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/packages"
+          rsync -axv --delete $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET
+          rsync -axv --delete $WEBROOT/snapshots/packages/$PLATFORM $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/packages
           echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/snapshots/targets/$TARGET/$SUBTARGET"

@@ -105,8 +105,7 @@ jobs:
           cp -r /data/cache/dl .
           echo "CONFIG_ALL=y" >> .config
           make defconfig
-          echo -e "$(nproc) threads download"
-          make download -j16
+          make download -j16 IGNORE_ERRORS=1
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 

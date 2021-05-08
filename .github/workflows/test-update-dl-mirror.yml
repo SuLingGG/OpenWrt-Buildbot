@@ -21,8 +21,6 @@ env:
 
 jobs:
   OpenWrt-Master:
-    needs: [Lean-Master]
-    if: always()
     runs-on: ubuntu-18.04
 
     steps:

@@ -319,7 +319,7 @@ jobs:
         run: |
           mkdir -p ~/.ssh/
           install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
+          echo "${{secrets.HOSTHATCH_PRIVATEKEY}}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
           bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET \
@@ -339,7 +339,7 @@ jobs:
         run: |
           mkdir -p ~/.ssh/
           install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
+          echo "${{secrets.OVH_PRIVATEKEY}}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
           bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET \
@@ -357,7 +357,7 @@ jobs:
         run: |
           mkdir -p ~/.ssh/
           install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
+          echo "${{secrets.PACIFICRACK_PRIVATEKEY}}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
           bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET \

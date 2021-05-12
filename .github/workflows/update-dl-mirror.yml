@@ -67,13 +67,13 @@ jobs:
           find dl -size -1024c -exec rm -f {} \;
           echo "::set-output name=DOWNLOAD_STATUS::success"
 
-      - name: Deploy Files To Server
-        id: server
+      - name: Deploy Files To HostHatch Node
+        id: hosthatch
         env:
-          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}"
+          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
           SOURCE_DL: "openwrt/dl/"
           DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
-          REMOTE_PRIVATEKEY: "${{secrets.REMOTE_PRIVATEKEY}}"
+          REMOTE_PRIVATEKEY: "${{secrets.HOSTHATCH_PRIVATEKEY}}"
         if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
         run: |
           mkdir -p ~/.ssh/
@@ -81,9 +81,42 @@ jobs:
           echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $WEBROOT/dl/immortalwrt/openwrt-18.06'"
+          bash -c "'mkdir -p $DEST_DL'"
           rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
-          echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/immortalwrt/openwrt-18.06"
+
+      - name: Deploy Files To OVH Node
+        id: ovh
+        env:
+          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.OVH_IP }}"
+          SOURCE_DL: "openwrt/dl/"
+          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
+          REMOTE_PRIVATEKEY: "${{secrets.OVH_PRIVATEKEY}}"
+        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
+        run: |
+          mkdir -p ~/.ssh/
+          install -m 600 /dev/null ~/.ssh/id_rsa
+          echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
+          bash -c "'mkdir -p $DEST_DL'"
+          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
+
+      - name: Deploy Files To PacificRack Node
+        id: pacificrack
+        env:
+          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.PACIFICRACK_IP }}"
+          SOURCE_DL: "openwrt/dl/"
+          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
+          REMOTE_PRIVATEKEY: "${{secrets.PACIFICRACK_PRIVATEKEY}}"
+        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
+        run: |
+          mkdir -p ~/.ssh/
+          install -m 600 /dev/null ~/.ssh/id_rsa
+          echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
+          bash -c "'mkdir -p $DEST_DL'"
+          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
 
   Immortalwrt-Master:
     needs: [Immortalwrt-1806]
@@ -133,13 +166,13 @@ jobs:
           find dl -size -1024c -exec rm -f {} \;
           echo "::set-output name=DOWNLOAD_STATUS::success"
 
-      - name: Deploy Files To Server
-        id: server
+      - name: Deploy Files To HostHatch Node
+        id: hosthatch
         env:
-          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}"
+          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
           SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/master/"
-          REMOTE_PRIVATEKEY: "${{secrets.REMOTE_PRIVATEKEY}}"
+          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
+          REMOTE_PRIVATEKEY: "${{secrets.HOSTHATCH_PRIVATEKEY}}"
         if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
         run: |
           mkdir -p ~/.ssh/
@@ -147,9 +180,42 @@ jobs:
           echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $WEBROOT/dl/immortalwrt/master'"
+          bash -c "'mkdir -p $DEST_DL'"
           rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
-          echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/immortalwrt/master"
+
+      - name: Deploy Files To OVH Node
+        id: ovh
+        env:
+          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.OVH_IP }}"
+          SOURCE_DL: "openwrt/dl/"
+          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
+          REMOTE_PRIVATEKEY: "${{secrets.OVH_PRIVATEKEY}}"
+        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
+        run: |
+          mkdir -p ~/.ssh/
+          install -m 600 /dev/null ~/.ssh/id_rsa
+          echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
+          bash -c "'mkdir -p $DEST_DL'"
+          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
+
+      - name: Deploy Files To PacificRack Node
+        id: pacificrack
+        env:
+          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.PACIFICRACK_IP }}"
+          SOURCE_DL: "openwrt/dl/"
+          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
+          REMOTE_PRIVATEKEY: "${{secrets.PACIFICRACK_PRIVATEKEY}}"
+        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
+        run: |
+          mkdir -p ~/.ssh/
+          install -m 600 /dev/null ~/.ssh/id_rsa
+          echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
+          bash -c "'mkdir -p $DEST_DL'"
+          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
 
   Lean-Master:
     needs: [Immortalwrt-Master]
@@ -199,13 +265,13 @@ jobs:
           find dl -size -1024c -exec rm -f {} \;
           echo "::set-output name=DOWNLOAD_STATUS::success"
 
-      - name: Deploy Files To Server
-        id: server
+      - name: Deploy Files To HostHatch Node
+        id: hosthatch
         env:
-          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}"
+          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
           SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "${{ env.WEBROOT }}/dl/lede/master/"
-          REMOTE_PRIVATEKEY: "${{secrets.REMOTE_PRIVATEKEY}}"
+          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
+          REMOTE_PRIVATEKEY: "${{secrets.HOSTHATCH_PRIVATEKEY}}"
         if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
         run: |
           mkdir -p ~/.ssh/
@@ -213,9 +279,42 @@ jobs:
           echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $WEBROOT/dl/lede/master'"
+          bash -c "'mkdir -p $DEST_DL'"
           rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
-          echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/lede/master"
+
+      - name: Deploy Files To OVH Node
+        id: ovh
+        env:
+          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.OVH_IP }}"
+          SOURCE_DL: "openwrt/dl/"
+          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
+          REMOTE_PRIVATEKEY: "${{secrets.OVH_PRIVATEKEY}}"
+        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
+        run: |
+          mkdir -p ~/.ssh/
+          install -m 600 /dev/null ~/.ssh/id_rsa
+          echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
+          bash -c "'mkdir -p $DEST_DL'"
+          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
+
+      - name: Deploy Files To PacificRack Node
+        id: pacificrack
+        env:
+          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.PACIFICRACK_IP }}"
+          SOURCE_DL: "openwrt/dl/"
+          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
+          REMOTE_PRIVATEKEY: "${{secrets.PACIFICRACK_PRIVATEKEY}}"
+        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
+        run: |
+          mkdir -p ~/.ssh/
+          install -m 600 /dev/null ~/.ssh/id_rsa
+          echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
+          bash -c "'mkdir -p $DEST_DL'"
+          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
 
   OpenWrt-Master:
     needs: [Lean-Master]
@@ -264,13 +363,13 @@ jobs:
           find dl -size -1024c -exec rm -f {} \;
           echo "::set-output name=DOWNLOAD_STATUS::success"
 
-      - name: Deploy Files To Server
-        id: server
+      - name: Deploy Files To HostHatch Node
+        id: hosthatch
         env:
-          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}"
+          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
           SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "${{ env.WEBROOT }}/dl/openwrt/master/"
-          REMOTE_PRIVATEKEY: "${{secrets.REMOTE_PRIVATEKEY}}"
+          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
+          REMOTE_PRIVATEKEY: "${{secrets.HOSTHATCH_PRIVATEKEY}}"
         if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
         run: |
           mkdir -p ~/.ssh/
@@ -278,9 +377,42 @@ jobs:
           echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $WEBROOT/dl/openwrt/master'"
+          bash -c "'mkdir -p $DEST_DL'"
           rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
-          echo "::warning file=Firmware-OpenWrt.cc::Download Link: https://openwrt.cc/dl/openwrt/master"
+
+      - name: Deploy Files To OVH Node
+        id: ovh
+        env:
+          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.OVH_IP }}"
+          SOURCE_DL: "openwrt/dl/"
+          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
+          REMOTE_PRIVATEKEY: "${{secrets.OVH_PRIVATEKEY}}"
+        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
+        run: |
+          mkdir -p ~/.ssh/
+          install -m 600 /dev/null ~/.ssh/id_rsa
+          echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
+          bash -c "'mkdir -p $DEST_DL'"
+          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
+
+      - name: Deploy Files To PacificRack Node
+        id: pacificrack
+        env:
+          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.PACIFICRACK_IP }}"
+          SOURCE_DL: "openwrt/dl/"
+          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
+          REMOTE_PRIVATEKEY: "${{secrets.PACIFICRACK_PRIVATEKEY}}"
+        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
+        run: |
+          mkdir -p ~/.ssh/
+          install -m 600 /dev/null ~/.ssh/id_rsa
+          echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
+          bash -c "'mkdir -p $DEST_DL'"
+          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
 
   Clean-Up-Archive-Packages:
     needs: [OpenWrt-Master]

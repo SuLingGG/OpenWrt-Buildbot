@@ -19,7 +19,7 @@ mkdir package/community
 pushd package/community
 
 # Add luci-app-dnsfilter
-git clone --depth=1 https://github.com/garypang13/luci-app-dnsfilter
+git clone --depth=1 https://github.com/garypang13/luci-app-dnsfilter -b oaf-3.0.1
 
 # Add luci-app-bypass
 git clone --depth=1 https://github.com/garypang13/luci-app-bypass

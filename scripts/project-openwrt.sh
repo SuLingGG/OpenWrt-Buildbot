@@ -19,7 +19,7 @@ mkdir package/community
 pushd package/community
 
 # Add luci-app-dnsfilter
-git clone --depth=1 https://github.com/garypang13/luci-app-dnsfilter -b oaf-3.0.1
+git clone --depth=1 https://github.com/garypang13/luci-app-dnsfilter
 
 # Add luci-app-bypass
 git clone --depth=1 https://github.com/garypang13/luci-app-bypass
@@ -29,7 +29,7 @@ git clone --depth=1 https://github.com/garypang13/smartdns-le
 git clone --depth=1 https://github.com/project-lede/luci-app-godproxy
 
 # Add luci-app-oaf
-git clone --depth=1 https://github.com/destan19/OpenAppFilter
+git clone --depth=1 https://github.com/destan19/OpenAppFilter -b oaf-3.0.1
 popd
 
 # Use Lean's qBittorrent

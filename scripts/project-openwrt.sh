@@ -9,10 +9,13 @@
 #sed -i 's/192.168.1.1/192.168.50.5/g' package/base-files/files/bin/config_generate
 
 # Mod zzz-default-settings
-pushd package/lean/default-settings/files
+pushd package/emortal/default-settings/files
 sed -i '/http/d' zzz-default-settings
 sed -i '/openwrt_luci/d' zzz-default-settings
 popd
+
+# Delete extra directory
+rm -rf package/lean
 
 # Clone community packages to package/community
 mkdir package/community

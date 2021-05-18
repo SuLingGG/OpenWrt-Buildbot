@@ -54,7 +54,7 @@ jobs:
           sudo umount /dev/loop*p1 || true
           sudo losetup -D || true
           rm -rf openwrt.img
-          fallocate -l 50G openwrt.img
+          fallocate -l 100G openwrt.img
           echo 'type=83' | sfdisk openwrt.img
           export LOOP="$(sudo losetup -f -P --show openwrt.img)"
           echo "LOOP=$LOOP" >> $GITHUB_ENV

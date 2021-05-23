@@ -60,7 +60,7 @@ jobs:
           echo "LOOP=$LOOP" >> $GITHUB_ENV
           echo "::set-output name=LOOP::$(echo $LOOP)"
           sudo mkfs.ext4 ${LOOP}p1
-          mkdir openwrt
+          mkdir -p openwrt
           sudo mount ${LOOP}p1 openwrt
           lsblk
           sudo chown -R suling:suling openwrt
@@ -172,7 +172,7 @@ jobs:
           export LOOP="$(sudo losetup -f -P --show openwrt.img)"
           echo "LOOP=$LOOP" >> $GITHUB_ENV
           echo "::set-output name=LOOP::$(echo $LOOP)"
-          mkdir openwrt
+          mkdir -p openwrt
           sudo mount ${LOOP}p1 openwrt
           lsblk
           sudo chown -R suling:suling openwrt
@@ -276,7 +276,7 @@ jobs:
           export LOOP="$(sudo losetup -f -P --show openwrt.img)"
           echo "LOOP=$LOOP" >> $GITHUB_ENV
           echo "::set-output name=LOOP::$(echo $LOOP)"
-          mkdir openwrt
+          mkdir -p openwrt
           sudo mount ${LOOP}p1 openwrt
           lsblk
           sudo chown -R suling:suling openwrt

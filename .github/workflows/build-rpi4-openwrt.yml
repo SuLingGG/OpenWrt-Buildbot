@@ -146,7 +146,7 @@ jobs:
           name: Logs-${{ github.job }}
           path: openwrt/output/logs/${{ github.job }}
 
-      - name: Prepare Disk Image
+      - name: Umount Disk Image
         id: prepare
         if: always()
         run: |
@@ -154,8 +154,6 @@ jobs:
           sudo umount ${LOOP}p1 || true
           sudo losetup -d $LOOP || true
           lsblk
-          mkdir -p /data/disk/$RUNNER
-          mv openwrt.img /data/disk/$RUNNER
 
   Firmware:
     if: needs.Toolchain.outputs.TOOLCHAIN_STATUS == 'success'
@@ -169,13 +167,9 @@ jobs:
       GENERATE_STATUS: ${{ steps.generate.outputs.GENERATE_STATUS }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@main
-
       - name: Initialization Environment
         id: init
         run: |
-          mv /data/disk/$RUNNER/openwrt.img .
           export LOOP="$(sudo losetup -f -P --show openwrt.img)"
           echo "LOOP=$LOOP" >> $GITHUB_ENV
           echo "::set-output name=LOOP::$(echo $LOOP)"
@@ -252,7 +246,7 @@ jobs:
           name: Logs-${{ github.job }}
           path: openwrt/output/logs/${{ github.job }}
 
-      - name: Prepare Disk Image
+      - name: Umount Disk Image
         if: always()
         id: prepare
         run: |
@@ -260,8 +254,6 @@ jobs:
           sudo umount ${LOOP}p1 || true
           sudo losetup -d $LOOP || true
           lsblk
-          mkdir -p /data/disk/$RUNNER
-          mv openwrt.img /data/disk/$RUNNER
 
   Extra-Packages:
     if: needs.Firmware.outputs.GENERATE_STATUS == 'success'
@@ -272,9 +264,6 @@ jobs:
       COMPILE_STATUS: ${{ steps.compile.outputs.COMPILE_STATUS }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@main
-
       - name: Restore Variables
         id: restore
         run: |
@@ -285,7 +274,6 @@ jobs:
       - name: Initialization Environment
         id: init
         run: |
-          mv /data/disk/$RUNNER/openwrt.img .
           export LOOP="$(sudo losetup -f -P --show openwrt.img)"
           echo "LOOP=$LOOP" >> $GITHUB_ENV
           echo "::set-output name=LOOP::$(echo $LOOP)"
@@ -321,7 +309,7 @@ jobs:
         run: |
           cd $OPENWRTROOT
           mv logs output/logs/${{ github.job }}
-          cp -r output/logs output/bin/targets/$TARGET/$SUBTARGET
+          [ -e output/bin/targets/$TARGET/$SUBTARGET ] && cp -r output/logs output/bin/targets/$TARGET/$SUBTARGET
 
       - name: Compress Bin Folder
         if: steps.compile.outputs.COMPILE_STATUS == 'success'
@@ -346,7 +334,7 @@ jobs:
           name: Logs-${{ github.job }}
           path: openwrt/output/logs/${{ github.job }}
 
-      - name: Prepare Disk Image
+      - name: Umount Disk Image
         if: always()
         id: prepare
         run: |
@@ -354,8 +342,6 @@ jobs:
           sudo umount ${LOOP}p1 || true
           sudo losetup -d $LOOP || true
           lsblk
-          mkdir -p /data/disk/$RUNNER
-          mv openwrt.img /data/disk/$RUNNER
 
   Upload:
     if: needs.Extra-Packages.outputs.COMPILE_STATUS == 'success'
@@ -363,9 +349,6 @@ jobs:
     runs-on: ubuntu-18.04
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@main
-
       - name: Restore Variables
         id: restore
         run: |

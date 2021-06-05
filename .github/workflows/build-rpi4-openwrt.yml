@@ -92,6 +92,7 @@ jobs:
         run: |
           [ -e files ] && mv files $OPENWRTROOT/files
           cd $OPENWRTROOT
+          echo -e "CONFIG_USB_LAN78XX=y\nCONFIG_USB_NET_DRIVERS=y" >> target/linux/bcm27xx/bcm2711/config-5.4
           chmod +x ../scripts/*.sh
           ../$DIY_SH
           ../scripts/preset-clash-core.sh armv8

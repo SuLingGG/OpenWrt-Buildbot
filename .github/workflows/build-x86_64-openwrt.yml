@@ -225,8 +225,6 @@ jobs:
           make package/install || make package/install -j1 V=s
           make target/install || make target/install -j1 V=s
           make checksum
-          cd $FIRMWARE
-          gzip *esxi-flat.vmdk
           mkdir -p $OPENWRTROOT/output/bin/targets/$TARGET
           cp -r $FIRMWARE $OPENWRTROOT/output/bin/targets/$TARGET
           echo "::set-output name=GENERATE_STATUS::success"

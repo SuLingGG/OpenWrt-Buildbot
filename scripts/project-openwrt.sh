@@ -14,9 +14,6 @@ sed -i '/http/d' zzz-default-settings
 sed -i '/openwrt_luci/d' zzz-default-settings
 popd
 
-# Delete extra directory
-rm -rf package/lean
-
 # Clone community packages to package/community
 mkdir package/community
 pushd package/community
@@ -31,17 +28,20 @@ git clone --depth=1 https://github.com/garypang13/smartdns-le
 # Add luci-app-godproxy
 git clone --depth=1 https://github.com/project-lede/luci-app-godproxy
 
+# Add luci-app-modeminfo
+git clone --depth=1 https://github.com/koshev-msk/luci-app-modeminfo
+
+# Add luci-app-change-mac
+git clone --depth=1 https://github.com/muink/luci-app-change-mac
+
+# Add luci-app-tcpdump
+git clone --depth=1 https://github.com/KFERMercer/luci-app-tcpdump
+
 # Add luci-app-oaf
 git clone --depth=1 https://github.com/destan19/OpenAppFilter -b oaf-3.0.1
-popd
 
-# Use Lean's qBittorrent
-pushd package/lean
-rm -rf luci-app-qbittorrent qBittorrent-Enhanced-Edition qt5
-svn co https://github.com/coolsnowwolf/lede/trunk/package/lean/rblibtorrent
-svn co https://github.com/coolsnowwolf/lede/trunk/package/lean/luci-app-qbittorrent
-svn co https://github.com/coolsnowwolf/lede/trunk/package/lean/qBittorrent
-svn co https://github.com/coolsnowwolf/lede/trunk/package/lean/qt5
+# Add luci-theme-argon_armygreen
+git clone --depth=1 https://github.com/XXKDB/luci-theme-argon_armygreen
 popd
 
 # Fix mt76 wireless driver

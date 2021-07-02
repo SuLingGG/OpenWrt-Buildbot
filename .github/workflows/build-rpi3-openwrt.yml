@@ -186,7 +186,7 @@ jobs:
           echo -e "$(nproc) threads compile"
           make target/compile -j$(nproc) 'IGNORE_ERRORS=n m' BUILD_LOG=1 || make target/compile -j1 V=s IGNORE_ERRORS=1
           make diffconfig
-          make package/compile -j$(nproc) BUILD_LOG=1 || make package/compile -j$(nproc) || make package/compile -j1 V=s
+          make package/compile -j$(nproc) 'IGNORE_ERRORS=n m' BUILD_LOG=1 || make package/compile -j1 V=s
           make package/index
           cd $OPENWRTROOT/bin/packages/*
           PLATFORM=$(basename `pwd`)

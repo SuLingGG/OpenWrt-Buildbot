@@ -31,9 +31,6 @@ git clone --depth=1 https://github.com/project-lede/luci-app-godproxy
 # Add luci-app-modeminfo
 git clone --depth=1 https://github.com/koshev-msk/luci-app-modeminfo
 
-# Add luci-app-change-mac
-git clone --depth=1 https://github.com/muink/luci-app-change-mac
-
 # Add luci-app-tcpdump
 git clone --depth=1 https://github.com/KFERMercer/luci-app-tcpdump
 

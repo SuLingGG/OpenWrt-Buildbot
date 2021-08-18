@@ -181,6 +181,8 @@ jobs:
 
       - name: Compile Firmware Packages
         id: compile
+        env:
+          DEBIAN_FRONTEND: noninteractive
         timeout-minutes: 330
         run: |
           cd $OPENWRTROOT
@@ -284,6 +286,8 @@ jobs:
 
       - name: Compile Extra Packages
         id: compile
+        env:
+          DEBIAN_FRONTEND: noninteractive
         timeout-minutes: 330
         run: |
           cd $OPENWRTROOT

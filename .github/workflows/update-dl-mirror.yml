@@ -91,7 +91,7 @@ jobs:
           rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
 
   Merge-Files:
-    needs: [Merge]
+    needs: [Download]
     if: always()
     runs-on: ubuntu-18.04
 

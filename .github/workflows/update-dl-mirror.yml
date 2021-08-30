@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        REPO: [openwrt/openwrt/master, openwrt/openwrt/openwrt-18.06, openwrt/openwrt/openwrt-19.07, openwrt/openwrt/openwrt-21.02, openwrt/openwrt/lede-17.01, coolsnowwolf/lede/master, immortalwrt/immortalwrt/openwrt-18.06, immortalwrt/immortalwrt/master, immortalwrt/immortalwrt/openwrt-18.06-dev, immortalwrt/immortalwrt/openwrt-18.06-k5.4, immortalwrt/immortalwrt/openwrt-21.02, Lienol/openwrt/main, Lienol/openwrt/19.07]
+        REPO: [openwrt/openwrt/master, openwrt/openwrt/openwrt-18.06, openwrt/openwrt/openwrt-19.07, openwrt/openwrt/openwrt-21.02, openwrt/openwrt/lede-17.01, coolsnowwolf/lede/master, immortalwrt/immortalwrt/openwrt-18.06, immortalwrt/immortalwrt/master, immortalwrt/immortalwrt/openwrt-18.06-dev, immortalwrt/immortalwrt/openwrt-18.06-k5.4, immortalwrt/immortalwrt/openwrt-21.02, lienol/openwrt/main, lienol/openwrt/19.07]
 
     steps:
       - name: Checkout
@@ -66,7 +66,6 @@ jobs:
         id: download
         run: |
           cd $OPENWRTROOT
-          wget -q https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
           echo "CONFIG_ALL=y" >> .config
           make defconfig
           make download -j32 IGNORE_ERRORS=1

@@ -9,7 +9,6 @@
 name: Update OpenWrt.cc DL Mirror
 
 on:
-  repository_dispatch:
   workflow_dispatch:
   schedule:
     - cron: 0 18 * * *
@@ -20,40 +19,48 @@ env:
   WEBROOT: /data/dnmp/www/openwrt.cc
 
 jobs:
-  Immortalwrt-1806:
+  Download:
     if: always()
     runs-on: ubuntu-18.04
+    strategy:
+      fail-fast: false
+      matrix:
+        REPO: [openwrt/openwrt/master, openwrt/openwrt/openwrt-18.06, openwrt/openwrt/openwrt-19.07, openwrt/openwrt/openwrt-21.02, openwrt/openwrt/lede-17.01, coolsnowwolf/lede/master, immortalwrt/immortalwrt/openwrt-18.06, immortalwrt/immortalwrt/master, immortalwrt/immortalwrt/openwrt-18.06-dev, immortalwrt/immortalwrt/openwrt-18.06-k5.4, immortalwrt/immortalwrt/openwrt-21.02, Lienol/openwrt/main, Lienol/openwrt/19.07]
 
     steps:
       - name: Checkout
         uses: actions/checkout@main
 
       - name: Initialization Environment
+        id: init
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
           sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
           sudo -E apt-get -qq update
           sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804)
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
           sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 
       - name: Clone Source Code
+        id: clone
+        env:
+          REPO: ${{ matrix.REPO }}
         run: |
           df -hT $PWD
-          git clone --depth=1 https://github.com/immortalwrt/immortalwrt -b openwrt-18.06 openwrt
+          export REPO_USER="$(echo $REPO | awk -F '/' '{print $1}')"
+          echo "REPO_USER=$REPO_USER" >> $GITHUB_ENV
+          export REPO_NAME="$(echo $REPO | awk -F '/' '{print $2}')"
+          echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
+          export REPO_BRANCH="$(echo $REPO | awk -F '/' '{print $3}')"
+          echo "REPO_BRANCH=$REPO_BRANCH" >> $GITHUB_ENV
+          git clone --depth=1 https://github.com/$REPO_USER/$REPO_NAME -b $REPO_BRANCH openwrt
 
-      - name: Update Feeds
+      - name: Install Feeds
+        id: feeds
         run: |
           cd openwrt
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
-          ./scripts/feeds update -a
-
-      - name: Install Feeds
-        run: |
-          cd $OPENWRTROOT
-          ./scripts/feeds install -a
+          ./scripts/feeds update -a && ./scripts/feeds install -a
 
       - name: Download All Packages
         id: download
@@ -62,17 +69,17 @@ jobs:
           wget -q https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
           echo "CONFIG_ALL=y" >> .config
           make defconfig
-          make download -j16 IGNORE_ERRORS=1
+          make download -j32 IGNORE_ERRORS=1
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
           echo "::set-output name=DOWNLOAD_STATUS::success"
 
-      - name: Deploy Files To HostHatch Node
-        id: hosthatch
+      - name: Deploy Files To Server
+        id: deploy
         env:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
           SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
+          DEST_DL: "${{ env.WEBROOT }}/dl/${{ env.REPO_USER }}/${{ env.REPO_NAME }}/${{ env.REPO_BRANCH }}/"
           REMOTE_PRIVATEKEY: "${{secrets.HOSTHATCH_PRIVATEKEY}}"
         if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
         run: |
@@ -84,42 +91,8 @@ jobs:
           bash -c "'mkdir -p $DEST_DL'"
           rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
 
-      - name: Deploy Files To OVH Node
-        id: ovh
-        env:
-          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.OVH_IP }}"
-          SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
-          REMOTE_PRIVATEKEY: "${{secrets.OVH_PRIVATEKEY}}"
-        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
-        run: |
-          mkdir -p ~/.ssh/
-          install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{secrets.OVH_PRIVATEKEY}}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $DEST_DL'"
-          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
-
-      - name: Deploy Files To PacificRack Node
-        id: pacificrack
-        env:
-          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.PACIFICRACK_IP }}"
-          SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
-          REMOTE_PRIVATEKEY: "${{secrets.PACIFICRACK_PRIVATEKEY}}"
-        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
-        run: |
-          mkdir -p ~/.ssh/
-          install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{secrets.PACIFICRACK_PRIVATEKEY}}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $DEST_DL'"
-          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
-
-  Immortalwrt-Master:
-    needs: [Immortalwrt-1806]
+  Merge-Same-Files:
+    needs: [Download]
     if: always()
     runs-on: ubuntu-18.04
 
@@ -127,311 +100,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@main
 
-      - name: Initialization Environment
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
-          sudo -E apt-get -qq update
-          sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804)
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
-          sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-
-      - name: Clone Source Code
-        run: |
-          df -hT $PWD
-          git clone --depth=1 https://github.com/immortalwrt/immortalwrt -b master openwrt
-
-      - name: Update Feeds
-        run: |
-          cd openwrt
-          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
-          ./scripts/feeds update -a
-
-      - name: Install Feeds
-        run: |
-          cd $OPENWRTROOT
-          ./scripts/feeds install -a
-
-      - name: Download All Packages
-        id: download
-        run: |
-          cd $OPENWRTROOT
-          wget -q https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
-          echo "CONFIG_ALL=y" >> .config
-          make defconfig
-          make download -j16 IGNORE_ERRORS=1
-          find dl -size -1024c -exec ls -l {} \;
-          find dl -size -1024c -exec rm -f {} \;
-          echo "::set-output name=DOWNLOAD_STATUS::success"
-
-      - name: Deploy Files To HostHatch Node
-        id: hosthatch
+      - name: Merge Same Files
+        id: merge
         env:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
-          SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
           REMOTE_PRIVATEKEY: "${{secrets.HOSTHATCH_PRIVATEKEY}}"
-        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
         run: |
           mkdir -p ~/.ssh/
           install -m 600 /dev/null ~/.ssh/id_rsa
           echo "${{secrets.HOSTHATCH_PRIVATEKEY}}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $DEST_DL'"
-          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
-
-      - name: Deploy Files To OVH Node
-        id: ovh
-        env:
-          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.OVH_IP }}"
-          SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
-          REMOTE_PRIVATEKEY: "${{secrets.OVH_PRIVATEKEY}}"
-        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
-        run: |
-          mkdir -p ~/.ssh/
-          install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{secrets.OVH_PRIVATEKEY}}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $DEST_DL'"
-          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
-
-      - name: Deploy Files To PacificRack Node
-        id: pacificrack
-        env:
-          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.PACIFICRACK_IP }}"
-          SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
-          REMOTE_PRIVATEKEY: "${{secrets.PACIFICRACK_PRIVATEKEY}}"
-        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
-        run: |
-          mkdir -p ~/.ssh/
-          install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{secrets.PACIFICRACK_PRIVATEKEY}}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $DEST_DL'"
-          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
-
-  Lean-Master:
-    needs: [Immortalwrt-Master]
-    if: always()
-    runs-on: ubuntu-18.04
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@main
-
-      - name: Initialization Environment
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
-          sudo -E apt-get -qq update
-          sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804)
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
-          sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-
-      - name: Clone Source Code
-        run: |
-          df -hT $PWD
-          git clone --depth=1 https://github.com/coolsnowwolf/lede -b master openwrt
-
-      - name: Update Feeds
-        run: |
-          cd openwrt
-          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
-          ./scripts/feeds update -a
-
-      - name: Install Feeds
-        run: |
-          cd $OPENWRTROOT
-          ./scripts/feeds install -a
-
-      - name: Download All Packages
-        id: download
-        run: |
-          cd $OPENWRTROOT
-          wget -q https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
-          echo "CONFIG_ALL=y" >> .config
-          make defconfig
-          make download -j16 IGNORE_ERRORS=1
-          find dl -size -1024c -exec ls -l {} \;
-          find dl -size -1024c -exec rm -f {} \;
-          echo "::set-output name=DOWNLOAD_STATUS::success"
-
-      - name: Deploy Files To HostHatch Node
-        id: hosthatch
-        env:
-          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
-          SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
-          REMOTE_PRIVATEKEY: "${{secrets.HOSTHATCH_PRIVATEKEY}}"
-        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
-        run: |
-          mkdir -p ~/.ssh/
-          install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{secrets.HOSTHATCH_PRIVATEKEY}}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $DEST_DL'"
-          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
-
-      - name: Deploy Files To OVH Node
-        id: ovh
-        env:
-          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.OVH_IP }}"
-          SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
-          REMOTE_PRIVATEKEY: "${{secrets.OVH_PRIVATEKEY}}"
-        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
-        run: |
-          mkdir -p ~/.ssh/
-          install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{secrets.OVH_PRIVATEKEY}}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $DEST_DL'"
-          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
-
-      - name: Deploy Files To PacificRack Node
-        id: pacificrack
-        env:
-          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.PACIFICRACK_IP }}"
-          SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
-          REMOTE_PRIVATEKEY: "${{secrets.PACIFICRACK_PRIVATEKEY}}"
-        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
-        run: |
-          mkdir -p ~/.ssh/
-          install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{secrets.PACIFICRACK_PRIVATEKEY}}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $DEST_DL'"
-          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
-
-  OpenWrt-Master:
-    needs: [Lean-Master]
-    if: always()
-    runs-on: ubuntu-18.04
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@main
-
-      - name: Initialization Environment
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
-          sudo -E apt-get -qq update
-          sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804)
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
-          sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-
-      - name: Clone Source Code
-        run: |
-          df -hT $PWD
-          git clone --depth=1 https://github.com/openwrt/openwrt -b master openwrt
-
-      - name: Update Feeds
-        run: |
-          cd openwrt
-          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
-          ./scripts/feeds update -a
-
-      - name: Install Feeds
-        run: |
-          cd $OPENWRTROOT
-          ./scripts/feeds install -a
-
-      - name: Download All Packages
-        id: download
-        run: |
-          cd $OPENWRTROOT
-          echo "CONFIG_ALL=y" >> .config
-          make defconfig
-          make download -j16 IGNORE_ERRORS=1
-          find dl -size -1024c -exec ls -l {} \;
-          find dl -size -1024c -exec rm -f {} \;
-          echo "::set-output name=DOWNLOAD_STATUS::success"
-
-      - name: Deploy Files To HostHatch Node
-        id: hosthatch
-        env:
-          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
-          SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
-          REMOTE_PRIVATEKEY: "${{secrets.HOSTHATCH_PRIVATEKEY}}"
-        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
-        run: |
-          mkdir -p ~/.ssh/
-          install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{secrets.HOSTHATCH_PRIVATEKEY}}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $DEST_DL'"
-          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
-
-      - name: Deploy Files To OVH Node
-        id: ovh
-        env:
-          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.OVH_IP }}"
-          SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
-          REMOTE_PRIVATEKEY: "${{secrets.OVH_PRIVATEKEY}}"
-        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
-        run: |
-          mkdir -p ~/.ssh/
-          install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{secrets.OVH_PRIVATEKEY}}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $DEST_DL'"
-          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
-
-      - name: Deploy Files To PacificRack Node
-        id: pacificrack
-        env:
-          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.PACIFICRACK_IP }}"
-          SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "${{ env.WEBROOT }}/dl/immortalwrt/openwrt-18.06/"
-          REMOTE_PRIVATEKEY: "${{secrets.PACIFICRACK_PRIVATEKEY}}"
-        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
-        run: |
-          mkdir -p ~/.ssh/
-          install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{secrets.PACIFICRACK_PRIVATEKEY}}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $DEST_DL'"
-          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
-
-  Clean-Up-Archive-Packages:
-    needs: [OpenWrt-Master]
-    if: always()
-    runs-on: ubuntu-18.04
-
-    steps:
-      - name: Clean Up Archive Packages
-        id: clean
-        env:
-          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}"
-          REMOTE_PRIVATEKEY: "${{secrets.REMOTE_PRIVATEKEY}}"
-        if: env.REMOTE_PRIVATEKEY != null
-        run: |
-          mkdir -p ~/.ssh/
-          install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{secrets.REMOTE_PRIVATEKEY}}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "cd /data/dnmp/www/openwrt.cc/archive"
-          find . -type d -name releases -mtime +2 | xargs rm -rf
-          find . -type d -path "*snapshots/packages" -mtime +2 | xargs rm -rf
+          sudo rdfind -makehardlinks true $WEBROOT/dl

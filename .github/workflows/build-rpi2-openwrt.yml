@@ -115,7 +115,7 @@ jobs:
           rm -f $OPENWRTROOT/.config*
           cp $CONFIG_FILE $OPENWRTROOT/.config
           cat config/firmware-extra.config >> $OPENWRTROOT/.config
-          cat config/extra-wireless-support.config >> $OPENWRTROOT/.config
+          cat config/base-wireless-support.config >> $OPENWRTROOT/.config
           cd $OPENWRTROOT
           make defconfig
           echo -e "$(nproc) threads compile"
@@ -187,7 +187,6 @@ jobs:
         run: |
           cd $OPENWRTROOT
           echo -e "$(nproc) threads compile"
-          echo '# CONFIG_RPI_AXIPERF is not set' >> target/linux/bcm27xx/bcm2709/config-5.4
           make target/compile -j$(nproc) 'IGNORE_ERRORS=n m' BUILD_LOG=1 || make target/compile -j1 V=s IGNORE_ERRORS=1
           make diffconfig
           make package/compile -j$(nproc) 'IGNORE_ERRORS=n m' BUILD_LOG=1 || make package/compile -j1 V=s

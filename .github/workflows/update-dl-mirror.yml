@@ -119,4 +119,4 @@ jobs:
           cd $WEBROOT/dl/immortalwrt/immortalwrt && \
           find . -type f -exec \mv -f {} . \; || true && \
           find . -type d -exec rm -rf {} \; || true && \
-          sudo rdfind -makehardlinks true $WEBROOT/dl'"
+          sudo rdfind -makehardlinks true $WEBROOT/dl && exit 0'"

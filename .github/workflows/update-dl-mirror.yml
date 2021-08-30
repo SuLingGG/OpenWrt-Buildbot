@@ -89,12 +89,9 @@ jobs:
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
           bash -c "'mkdir -p $DEST_DL'"
           rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
-          cd $WEBROOT/dl/$REPO_USER/REPO_NAME
-          mv -f $REPO_BRANCH/* .
-          rm -f $REPO_BRANCH
 
-  Merge-Same-Files:
-    needs: [Download]
+  Merge-Files:
+    needs: [Merge]
     if: always()
     runs-on: ubuntu-18.04
 
@@ -113,4 +110,13 @@ jobs:
           echo "${{secrets.HOSTHATCH_PRIVATEKEY}}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
+          cd $WEBROOT/dl/coolsnowwolf/lede
+          find . -type f -exec \mv -f {} . +
+          find . -type d -exec rm -rf {} +
+          cd $WEBROOT/dl/openwrt/openwrt
+          find . -type f -exec \mv -f {} . +
+          find . -type d -exec rm -rf {} +
+          cd $WEBROOT/dl/immortalwrt/immortalwrt
+          find . -type f -exec \mv -f {} . +
+          find . -type d -exec rm -rf {} +
           sudo rdfind -makehardlinks true $WEBROOT/dl

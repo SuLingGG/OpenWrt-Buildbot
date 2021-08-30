@@ -89,6 +89,9 @@ jobs:
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
           bash -c "'mkdir -p $DEST_DL'"
           rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
+          cd $WEBROOT/dl/$REPO_USER/REPO_NAME
+          mv -f $REPO_BRANCH/* .
+          rm -f $REPO_BRANCH
 
   Merge-Same-Files:
     needs: [Download]

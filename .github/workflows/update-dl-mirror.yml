@@ -135,9 +135,10 @@ jobs:
       - name: Organize Files
         id: organize
         run: |
-          cd $OPENWRTROOT/dl
+          cd $OPENWRTROOT/output
           find . -name "*.tar.gz" -exec tar -zxvf {} \; -exec rm -f {} \;
-          sudo rdfind -makehardlinks true $OPENWRTROOT/dl
+          sudo rdfind -makehardlinks true .
+          rm results.txt
 
       - name: Deploy Files To Server
         id: deploy

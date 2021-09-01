@@ -63,7 +63,7 @@ jobs:
           ./scripts/feeds update -a && ./scripts/feeds install -a
 
       - name: Download All Packages
-        id: download
+        id: download-dl
         run: |
           cd $OPENWRTROOT
           echo "CONFIG_ALL=y" >> .config
@@ -71,24 +71,17 @@ jobs:
           make download -j32 IGNORE_ERRORS=1
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
+          mv dl $REPO_USER-$REPO_NAME-$REPO_BRANCH
+          zip -qr $REPO_USER-$REPO_NAME-$REPO_BRANCH.zip $REPO_USER-$REPO_NAME-$REPO_BRANCH
           echo "::set-output name=DOWNLOAD_STATUS::success"
 
-      - name: Deploy Files To Server
-        id: deploy
-        env:
-          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
-          SOURCE_DL: "openwrt/dl/"
-          DEST_DL: "${{ env.WEBROOT }}/dl/${{ env.REPO_USER }}/${{ env.REPO_NAME }}/${{ env.REPO_BRANCH }}/"
-          REMOTE_PRIVATEKEY: "${{secrets.HOSTHATCH_PRIVATEKEY}}"
-        if: steps.download.outputs.DOWNLOAD_STATUS == 'success' && env.REMOTE_PRIVATEKEY != null
-        run: |
-          mkdir -p ~/.ssh/
-          install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{secrets.HOSTHATCH_PRIVATEKEY}}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $DEST_DL'"
-          rsync -chavP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
+      - name: Upload DL Folder
+        id: upload-artifacts
+        if: steps.download-dl.outputs.DOWNLOAD_STATUS == 'success'
+        uses: actions/upload-artifact@main
+        with:
+          name: ${{ env.REPO_USER }}-${{ env.REPO_NAME }}-${{ env.REPO_BRANCH }}
+          path: openwrt/${{ env.REPO_USER }}-${{ env.REPO_NAME }}-${{ env.REPO_BRANCH }}.zip
 
   Merge-Files:
     needs: [Download]
@@ -99,10 +92,49 @@ jobs:
       - name: Checkout
         uses: actions/checkout@main
 
-      - name: Merge Same Files
-        id: merge
+      - name: Download DL
+        id: download-artifacts
+        uses: actions/download-artifact@v2
+        with:
+          path: openwrt/dl
+
+      - name: Install Rdfind
+        id: install-rdfind
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq install rdfind
+          sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+          cd openwrt
+          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
+
+      - name: Organize Files
+        id: organize
+        run: |
+          cd $OPENWRTROOT/dl
+          find . -name "*.zip" -exec unzip {} \;
+          find . -name "*.zip" -exec rm -f {} \;
+          mkdir -p openwrt/openwrt immortalwrt/immortalwrt coolsnowwolf/lede lienol/openwrt
+          mv openwrt-* openwrt/openwrt
+          mv immortalwrt-* immortalwrt/immortalwrt
+          mv coolsnowwolf-* coolsnowwolf/lede
+          mv lienol-* lienol/openwrt
+          for REPOPATH in openwrt/openwrt immortalwrt/immortalwrt coolsnowwolf/lede lienol/openwrt
+          do
+              cd $OPENWRTROOT/dl/$REPOPATH
+              ls | xargs -i rsync -axvu {}/ .
+              export REPO_USER=$(echo $REPOPATH | awk -F "/" '{print $1}')
+              rm -rf $REPO_USER-*
+          done
+          sudo rdfind -makehardlinks true $OPENWRTROOT/dl
+
+      - name: Deploy Files To Server
+        id: deploy
         env:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
+          SOURCE_DL: "openwrt/dl/"
+          DEST_DL: "${{ env.WEBROOT }}/dl/"
           REMOTE_PRIVATEKEY: "${{secrets.HOSTHATCH_PRIVATEKEY}}"
         run: |
           mkdir -p ~/.ssh/
@@ -110,13 +142,5 @@ jobs:
           echo "${{secrets.HOSTHATCH_PRIVATEKEY}}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'cd $WEBROOT/dl/coolsnowwolf/lede && \
-          find . -type f -exec \mv -f {} . \; || true && \
-          find . -type d -exec rm -rf {} \; || true && \
-          cd $WEBROOT/dl/openwrt/openwrt && \
-          find . -type f -exec \mv -f {} . \; || true && \
-          find . -type d -exec rm -rf {} \; || true && \
-          cd $WEBROOT/dl/immortalwrt/immortalwrt && \
-          find . -type f -exec \mv -f {} . \; || true && \
-          find . -type d -exec rm -rf {} \; || true && \
-          sudo rdfind -makehardlinks true $WEBROOT/dl && exit 0'"
+          bash -c "'mkdir -p $DEST_DL'"
+          rsync -chavHP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL

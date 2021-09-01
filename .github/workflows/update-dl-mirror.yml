@@ -17,6 +17,7 @@ on:
 
 env:
   WEBROOT: /data/dnmp/www/openwrt.cc
+  DEPLOY: true
 
 jobs:
   Download:
@@ -25,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        REPO: [openwrt/openwrt/master, openwrt/openwrt/openwrt-18.06, openwrt/openwrt/openwrt-19.07, openwrt/openwrt/openwrt-21.02, openwrt/openwrt/lede-17.01, coolsnowwolf/lede/master, immortalwrt/immortalwrt/openwrt-18.06, immortalwrt/immortalwrt/master, immortalwrt/immortalwrt/openwrt-18.06-dev, immortalwrt/immortalwrt/openwrt-18.06-k5.4, immortalwrt/immortalwrt/openwrt-21.02, lienol/openwrt/main, lienol/openwrt/19.07]
+        REPO: [openwrt/openwrt, coolsnowwolf/lede, immortalwrt/immortalwrt, lienol/openwrt]
 
     steps:
       - name: Checkout
@@ -38,11 +39,13 @@ jobs:
         run: |
           sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
           sudo -E apt-get -qq update
-          sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804)
+          sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804) rdfind
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
           sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 
-      - name: Clone Source Code
-        id: clone
+      - name: Download All Packages
+        id: download
         env:
           REPO: ${{ matrix.REPO }}
         run: |
@@ -51,39 +54,56 @@ jobs:
           echo "REPO_USER=$REPO_USER" >> $GITHUB_ENV
           export REPO_NAME="$(echo $REPO | awk -F '/' '{print $2}')"
           echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
-          export REPO_BRANCH="$(echo $REPO | awk -F '/' '{print $3}')"
-          echo "REPO_BRANCH=$REPO_BRANCH" >> $GITHUB_ENV
-          git clone --depth=1 https://github.com/$REPO_USER/$REPO_NAME -b $REPO_BRANCH openwrt
 
-      - name: Install Feeds
-        id: feeds
-        run: |
-          cd openwrt
-          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
-          ./scripts/feeds update -a && ./scripts/feeds install -a
+          export OPENWRT_BRANCH="master openwrt-18.06 openwrt-19.07 openwrt-21.02 lede-17.01"
+          export IMMORTALWRT_BRANCH="master openwrt-18.06 openwrt-18.06-dev openwrt-18.06-k5.4 openwrt-21.02"
+          export COOLSNOWWOLF_BRANCH="master"
+          export LIENOL_BRANCH="main 19.07"
 
-      - name: Download All Packages
-        id: download-dl
-        run: |
-          cd $OPENWRTROOT
-          echo "CONFIG_ALL=y" >> .config
-          make defconfig
-          make download -j32 IGNORE_ERRORS=1
-          find dl -size -1024c -exec ls -l {} \;
-          find dl -size -1024c -exec rm -f {} \;
-          mv dl $REPO_USER-$REPO_NAME-$REPO_BRANCH
-          zip -qr $REPO_USER-$REPO_NAME-$REPO_BRANCH.zip $REPO_USER-$REPO_NAME-$REPO_BRANCH
-          echo "::set-output name=DOWNLOAD_STATUS::success"
+          if [ $REPO_USER == openwrt ]
+          then
+              export BRANCH=$OPENWRT_BRANCH
+          elif [ $REPO_USER == immortalwrt ]
+          then
+              export BRANCH=$IMMORTALWRT_BRANCH
+          elif [ $REPO_USER == coolsnowwolf ]
+          then
+              export BRANCH=$COOLSNOWWOLF_BRANCH
+          else
+              export BRANCH=$LIENOL_BRANCH
+          fi
+
+          for REPO_BRANCH in $BRANCH
+          do
+              git clone --depth=1 https://github.com/$REPO_USER/$REPO_NAME -b $REPO_BRANCH $REPO_BRANCH
+              pushd $REPO_BRANCH
+              ./scripts/feeds update -a && ./scripts/feeds install -a
+              echo "CONFIG_ALL=y" >> .config
+              make defconfig
+              make download -j32 IGNORE_ERRORS=1
+              find dl -size -1024c -exec ls -l {} \;
+              find dl -size -1024c -exec rm -f {} \;
+              mkdir -p ../output/$REPO_USER/$REPO_NAME
+              mv dl ../output/$REPO_USER/$REPO_NAME/$REPO_USER-$REPO_NAME-$REPO_BRANCH
+              popd
+          done
+
+          pushd output/$REPO_USER/$REPO_NAME
+          ls | xargs -i rsync -axvu {}/ .
+          rm -rf $REPO_USER-*
+          popd
+          
+          sudo rdfind -makehardlinks true output
+          tar -zcvf $REPO_USER-$REPO_NAME.tar.gz output/*
 
       - name: Upload DL Folder
         id: upload-artifacts
-        if: steps.download-dl.outputs.DOWNLOAD_STATUS == 'success'
         uses: actions/upload-artifact@main
         with:
-          name: ${{ env.REPO_USER }}-${{ env.REPO_NAME }}-${{ env.REPO_BRANCH }}
-          path: openwrt/${{ env.REPO_USER }}-${{ env.REPO_NAME }}-${{ env.REPO_BRANCH }}.zip
+          name: ${{ env.REPO_USER }}-${{ env.REPO_NAME }}
+          path: ${{ env.REPO_USER }}-${{ env.REPO_NAME }}.tar.gz
 
-  Merge-Files:
+  Merge-And-Upload:
     needs: [Download]
     if: always()
     runs-on: ubuntu-18.04
@@ -96,15 +116,18 @@ jobs:
         id: download-artifacts
         uses: actions/download-artifact@v2
         with:
-          path: openwrt/dl
+          path: openwrt
 
       - name: Install Rdfind
-        id: install-rdfind
+        id: install
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
+          sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
           sudo -E apt-get -qq update
           sudo -E apt-get -qq install rdfind
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
           sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
           cd openwrt
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
@@ -113,27 +136,15 @@ jobs:
         id: organize
         run: |
           cd $OPENWRTROOT/dl
-          find . -name "*.zip" -exec unzip {} \;
-          find . -name "*.zip" -exec rm -f {} \;
-          mkdir -p openwrt/openwrt immortalwrt/immortalwrt coolsnowwolf/lede lienol/openwrt
-          mv openwrt-* openwrt/openwrt
-          mv immortalwrt-* immortalwrt/immortalwrt
-          mv coolsnowwolf-* coolsnowwolf/lede
-          mv lienol-* lienol/openwrt
-          for REPOPATH in openwrt/openwrt immortalwrt/immortalwrt coolsnowwolf/lede lienol/openwrt
-          do
-              cd $OPENWRTROOT/dl/$REPOPATH
-              ls | xargs -i rsync -axvu {}/ .
-              export REPO_USER=$(echo $REPOPATH | awk -F "/" '{print $1}')
-              rm -rf $REPO_USER-*
-          done
+          find . -name "*.tar.gz" -exec tar -zxvf {} \; -exec rm -f {} \;
           sudo rdfind -makehardlinks true $OPENWRTROOT/dl
 
       - name: Deploy Files To Server
         id: deploy
+        if: env.DEPLOY == 'true' 
         env:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
-          SOURCE_DL: "openwrt/dl/"
+          SOURCE_DL: "openwrt/output/"
           DEST_DL: "${{ env.WEBROOT }}/dl/"
           REMOTE_PRIVATEKEY: "${{secrets.HOSTHATCH_PRIVATEKEY}}"
         run: |

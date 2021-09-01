@@ -92,59 +92,15 @@ jobs:
           ls | xargs -i rsync -axvu {}/ .
           rm -rf $REPO_USER-*
           popd
-          
           sudo rdfind -makehardlinks true output
-          tar -zcvf $REPO_USER-$REPO_NAME.tar.gz output/*
-
-      - name: Upload DL Folder
-        id: upload-artifacts
-        uses: actions/upload-artifact@main
-        with:
-          name: ${{ env.REPO_USER }}-${{ env.REPO_NAME }}
-          path: ${{ env.REPO_USER }}-${{ env.REPO_NAME }}.tar.gz
-
-  Merge-And-Upload:
-    needs: [Download]
-    if: always()
-    runs-on: ubuntu-18.04
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@main
-
-      - name: Initialization Upload Environment
-        id: upload-init
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
-          sudo -E apt-get -qq update
-          sudo -E apt-get -qq install rdfind
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
-          sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-
-      - name: Download DL Artifacts
-        id: download-artifacts
-        uses: actions/download-artifact@v2
-        with:
-          path: openwrt
-
-      - name: Organize Files
-        id: organize
-        run: |
-          cd openwrt
-          find . -name "*.tar.gz" -exec tar -zxvf {} \; -exec rm -f {} \;
-          sudo rdfind -makehardlinks true .
-          sudo rm -f results.txt
 
       - name: Deploy Files To Server
         id: deploy
         if: env.DEPLOY == 'true'
         env:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
-          SOURCE_DL: "openwrt/output/"
-          DEST_DL: "${{ env.WEBROOT }}/dl/"
+          SOURCE_DL: "openwrt/output/${{ env.REPO_USER }}/${{ env.REPO_NAME }}/"
+          DEST_DL: "${{ env.WEBROOT }}/dl/${{ env.REPO_USER }}/${{ env.REPO_NAME }}/"
           REMOTE_PRIVATEKEY: "${{secrets.HOSTHATCH_PRIVATEKEY}}"
         run: |
           mkdir -p ~/.ssh/

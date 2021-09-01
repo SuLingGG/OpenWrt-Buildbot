@@ -112,14 +112,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@main
 
-      - name: Download DL
-        id: download-artifacts
-        uses: actions/download-artifact@v2
-        with:
-          path: openwrt
-
-      - name: Install Rdfind
-        id: install
+      - name: Install & Clean
+        id: install-clean
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
@@ -131,6 +125,12 @@ jobs:
           sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
           cd openwrt
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
+
+      - name: Download DL
+        id: download-artifacts
+        uses: actions/download-artifact@v2
+        with:
+          path: openwrt
 
       - name: Organize Files
         id: organize

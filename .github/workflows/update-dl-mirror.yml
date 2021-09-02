@@ -99,7 +99,7 @@ jobs:
         if: env.DEPLOY == 'true'
         env:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
-          SOURCE_DL: "openwrt/output/${{ env.REPO_USER }}/${{ env.REPO_NAME }}/"
+          SOURCE_DL: "output/${{ env.REPO_USER }}/${{ env.REPO_NAME }}/"
           DEST_DL: "${{ env.WEBROOT }}/dl/${{ env.REPO_USER }}/${{ env.REPO_NAME }}/"
           REMOTE_PRIVATEKEY: "${{secrets.HOSTHATCH_PRIVATEKEY}}"
         run: |

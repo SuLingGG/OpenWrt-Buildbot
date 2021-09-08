@@ -377,6 +377,24 @@ jobs:
           cd bin/targets/$TARGET/$SUBTARGET
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
 
+      - name: Deploy Files To Onedrive
+        id: onedrive
+        env:
+          SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          SOURCE_PACKAGES: "openwrt/bin/packages/${{ env.PLATFORM }}/"
+          DEST_TARGETS: "snapshots/targets/${{ env.TARGET }}"
+          DEST_PACKAGES: "snapshots/packages"
+          ONEDRIVEUPLOADER_CONF: "${{ secrets.ONEDRIVEUPLOADER_CONF }}"
+        if: env.ONEDRIVEUPLOADER_CONF != null
+        run: |
+          echo -e "${ONEDRIVEUPLOADER_CONF}" | tee ./auth.json > /dev/null
+          wget -q https://raw.githubusercontent.com/MoeClub/OneList/master/OneDriveUploader/amd64/linux/OneDriveUploader
+          chmod +x OneDriveUploader
+          ./OneDriveUploader -f -c "./auth.json" -s $SOURCE_TARGETS -r $DEST_TARGETS
+          ./OneDriveUploader -f -c "./auth.json" -s $SOURCE_PACKAGES -r $DEST_PACKAGES
+          ./OneDriveUploader -f -c "./auth.json" -s $SOURCE_TARGETS -r "archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET"
+          ./OneDriveUploader -f -c "./auth.json" -s $SOURCE_PACKAGES -r "archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/packages"
+
       - name: Deploy Files To HostHatch Node
         id: hosthatch
         env:
@@ -394,14 +412,9 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
           bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET \
-          $WEBROOT/snapshots/packages/$PLATFORM \
-          $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET \
-          $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/packages'"
+          $WEBROOT/snapshots/packages/$PLATFORM'"
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
-          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'rsync -axv --delete $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET && \
-          rsync -axv --delete $WEBROOT/snapshots/packages/$PLATFORM $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/packages'"
 
       - name: Deploy Files To PacificRack Node
         id: pacificrack

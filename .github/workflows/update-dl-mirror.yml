@@ -110,3 +110,16 @@ jobs:
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
           bash -c "'mkdir -p $DEST_DL'"
           rsync -chavHP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
+
+      - name: Deploy Files To Onedrive
+        id: onedrive
+        if: env.DEPLOY == 'true'
+        env:
+          SOURCE_DL: "output/${{ env.REPO_USER }}/${{ env.REPO_NAME }}"
+          DEST_DL: "dl/${{ env.REPO_USER }}"
+          ONEDRIVEUPLOADER_CONF: "${{ secrets.ONEDRIVEUPLOADER_CONF }}"
+        run: |
+          echo -e "${ONEDRIVEUPLOADER_CONF}" | tee ./auth.json > /dev/null
+          wget -q https://raw.githubusercontent.com/MoeClub/OneList/master/OneDriveUploader/amd64/linux/OneDriveUploader
+          chmod +x OneDriveUploader
+          ./OneDriveUploader -f -c "./auth.json" -s $SOURCE_DL -r $DEST_DL

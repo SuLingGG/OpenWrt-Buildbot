@@ -299,6 +299,20 @@ jobs:
           cd bin/targets/$TARGET/$SUBTARGET
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
 
+      - name: Deploy Files To Onedrive
+        id: onedrive
+        env:
+          SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          DEST_TARGETS: "snapshots/targets/${{ env.TARGET }}"
+          ONEDRIVEUPLOADER_CONF: "${{ secrets.ONEDRIVEUPLOADER_CONF }}"
+        if: env.ONEDRIVEUPLOADER_CONF != null
+        run: |
+          echo -e "${ONEDRIVEUPLOADER_CONF}" | tee ./auth.json > /dev/null
+          wget -q https://raw.githubusercontent.com/MoeClub/OneList/master/OneDriveUploader/amd64/linux/OneDriveUploader
+          chmod +x OneDriveUploader
+          ./OneDriveUploader -f -c "./auth.json" -s $SOURCE_TARGETS -r $DEST_TARGETS
+          ./OneDriveUploader -f -c "./auth.json" -s $SOURCE_TARGETS -r "archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET"
+
       - name: Deploy Files To HostHatch Node
         id: hosthatch
         env:
@@ -316,8 +330,6 @@ jobs:
           bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET \
           $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET'"
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
-          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'rsync -axv --delete $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET'"
 
       - name: Deploy Files To PacificRack Node
         id: pacificrack

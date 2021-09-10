@@ -436,3 +436,20 @@ jobs:
           $WEBROOT/snapshots/packages/$PLATFORM'"
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
+
+      - name: Deploy Files To OneDrive
+        env:
+          RCLONE_NAME: ${{ secrets.RCLONE_NAME }}
+          SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}"
+          SOURCE_PACKAGES: "openwrt/bin/packages/${{ env.PLATFORM }}/"
+          DEST_TARGETS: "/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}"
+          DEST_PACKAGES: "/snapshots/packages/${{ env.PLATFORM }}/"
+        if: env.RCLONE_NAME != null
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+          mkdir -p ~/.config/rclone/
+          cat << EOF > ~/.config/rclone/rclone.conf
+          ${{ secrets.RCLONE_CONFIG }}
+          EOF
+          rclone -v copy $SOURCE_TARGETS ${{ secrets.RCLONE_NAME }}:$DEST_TARGETS
+          rclone -v copy $SOURCE_PACKAGES ${{ secrets.RCLONE_NAME }}:$DEST_PACKAGES

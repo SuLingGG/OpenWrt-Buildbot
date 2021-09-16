@@ -377,10 +377,8 @@ jobs:
           sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
           cd openwrt
           echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
-          zip -q -s 0 bin-archive.zip --out bin.zip
-          unzip bin.zip
-          cd bin/targets/$TARGET/$SUBTARGET
-          echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+          zip -q -s 0 bin-archive.zip --out $TARGET-$SUBTARGET.zip
+          unzip $TARGET-$SUBTARGET.zip
 
       - name: Deploy Files To HostHatch Node
         id: hosthatch
@@ -424,19 +422,17 @@ jobs:
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
 
-      - name: Deploy Files To OneDrive
+      - name: Deploy Files To Onedrive
+        id: onedrive
         env:
-          RCLONE_NAME: ${{ secrets.RCLONE_NAME }}
           SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}"
-          SOURCE_PACKAGES: "openwrt/bin/packages/${{ env.PLATFORM }}/"
-          DEST_TARGETS: "/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}"
-          DEST_PACKAGES: "/snapshots/packages/${{ env.PLATFORM }}/"
-        if: env.RCLONE_NAME != null
+          DEST_TARGETS: "snapshots/targets/${{ env.TARGET }}"
+          ONEDRIVEUPLOADER_CONF: "${{ secrets.ONEDRIVEUPLOADER_CONF }}"
+        if: env.ONEDRIVEUPLOADER_CONF != null
         run: |
-          curl https://rclone.org/install.sh | sudo bash
-          mkdir -p ~/.config/rclone/
-          cat << EOF > ~/.config/rclone/rclone.conf
-          ${{ secrets.RCLONE_CONFIG }}
-          EOF
-          rclone -v copy $SOURCE_TARGETS ${{ secrets.RCLONE_NAME }}:$DEST_TARGETS
-          rclone -v copy $SOURCE_PACKAGES ${{ secrets.RCLONE_NAME }}:$DEST_PACKAGES
+          echo -e "${ONEDRIVEUPLOADER_CONF}" | tee ./auth.json > /dev/null
+          wget -q https://raw.githubusercontent.com/MoeClub/OneList/master/OneDriveUploader/amd64/linux/OneDriveUploader
+          chmod +x OneDriveUploader
+          rm -rf $SOURCE_TARGETS/packages
+          ./OneDriveUploader -f -c "./auth.json" -s $SOURCE_TARGETS -r $DEST_TARGETS
+          ./OneDriveUploader -f -c "./auth.json" -s $OPENWRTROOT/$TARGET-$SUBTARGET.zip -r "archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots"

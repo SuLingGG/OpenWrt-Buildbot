@@ -433,6 +433,6 @@ jobs:
           echo -e "${ONEDRIVEUPLOADER_CONF}" | tee ./auth.json > /dev/null
           wget -q https://raw.githubusercontent.com/MoeClub/OneList/master/OneDriveUploader/amd64/linux/OneDriveUploader
           chmod +x OneDriveUploader
-          rm -rf $SOURCE_TARGETS/packages
+          rm -rf $SOURCE_TARGETS/packages $SOURCE_TARGETS/logs
           ./OneDriveUploader -f -c "./auth.json" -s $SOURCE_TARGETS -r $DEST_TARGETS
           ./OneDriveUploader -f -c "./auth.json" -s $OPENWRTROOT/$TARGET-$SUBTARGET.zip -r "archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots"

@@ -430,4 +430,5 @@ jobs:
           chmod +x OneDriveUploader
           rm -rf $SOURCE_TARGETS/packages $SOURCE_TARGETS/logs
           ./OneDriveUploader -f -c "./auth.json" -s $SOURCE_TARGETS -r $DEST_TARGETS
-          ./OneDriveUploader -f -c "./auth.json" -s $OPENWRTROOT/$TARGET-$SUBTARGET.zip -r "archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots"
+          ./OneDriveUploader -f -c "./auth.json" -s $SOURCE_TARGETS -r "archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET/$SUBTARGET"
+          ./OneDriveUploader -f -c "./auth.json" -s $OPENWRTROOT/$TARGET-$SUBTARGET.zip -r "archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/bin-archive"

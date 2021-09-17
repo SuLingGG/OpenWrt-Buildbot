@@ -311,8 +311,7 @@ jobs:
           echo "${{secrets.HOSTHATCH_PRIVATEKEY}}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET \
-          $WEBROOT/archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET'"
+          bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET'"
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
 
       - name: Deploy Files To PacificRack Node

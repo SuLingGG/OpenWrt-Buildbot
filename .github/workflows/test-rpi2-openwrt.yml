@@ -1,0 +1,423 @@
+#=================================================
+# https://github.com/P3TERX/Actions-OpenWrt
+# Description: Build OpenWrt using GitHub Actions
+# Lisence: MIT
+# Author: P3TERX
+# Blog: https://p3terx.com
+#=================================================
+
+name: Test Raspberry Pi 2 OpenWrt
+
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: 0 20 * * 1,3,5
+  # watch:
+  #   types: started
+
+env:
+  CONFIG_FILE: config/bcm27xx/rpi2-openwrt-target.config
+  SOURCE_URL: https://github.com/immortalwrt/immortalwrt
+  SOURCE_BRANCH: openwrt-18.06-k5.4
+  DIY_SH: scripts/immortalwrt.sh
+  WEBROOT: /data/dnmp/www/openwrt.cc
+  TOOLCHAIN_TAG: toolchain
+  TOOLCHAIN_RELEASE_UPLOAD: true
+  FIRMWARE_RELEASE_UPLOAD: true
+  RUNNER: project-rpi2
+  TZ: Asia/Shanghai
+
+jobs:
+  Toolchain:
+    runs-on: project-rpi2
+
+    outputs:
+      OPENWRTROOT: ${{ steps.clone.outputs.OPENWRTROOT }}
+      CURRENT_BRANCH: ${{ steps.env.outputs.CURRENT_BRANCH }}
+      SOURCE_OWNER: ${{ steps.env.outputs.SOURCE_OWNER }}
+      SOURCE_REPO: ${{ steps.env.outputs.SOURCE_REPO }}
+      PLATFORM: ${{ steps.env.outputs.PLATFORM }}
+      TARGET: ${{ steps.env.outputs.TARGET }}
+      SUBTARGET: ${{ steps.env.outputs.SUBTARGET }}
+      TOOLCHAIN_IMAGE: ${{ steps.env.outputs.TOOLCHAIN_IMAGE }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Clone Source Code
+        id: clone
+        run: |
+          df -hT $PWD
+          git clone $SOURCE_URL -b $SOURCE_BRANCH openwrt
+          cd openwrt
+          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
+          echo "::set-output name=OPENWRTROOT::$(echo $PWD)"
+
+      - name: Generate Toolchain Config
+        run: |
+          [ -e $CONFIG_FILE ] && mv $CONFIG_FILE $OPENWRTROOT/.config
+          echo -e "\nCONFIG_ALL=y" >> $OPENWRTROOT/.config
+          echo -e "\nCONFIG_ALL_NONSHARED=y" >> $OPENWRTROOT/.config
+          cd $OPENWRTROOT
+          make defconfig > /dev/null 2>&1
+
+      - name: Generate Variables
+        id: env
+        run: |
+          export CURRENT_BRANCH="$(git symbolic-ref --short HEAD)"
+          echo "CURRENT_BRANCH=$CURRENT_BRANCH" >> $GITHUB_ENV
+          echo "::set-output name=CURRENT_BRANCH::$(echo $CURRENT_BRANCH)"
+          cd $OPENWRTROOT
+          export SOURCE_OWNER="$(echo $SOURCE_URL | awk -F '/' '{print $(NF-1)}')"
+          echo "SOURCE_OWNER=$SOURCE_OWNER" >> $GITHUB_ENV
+          echo "::set-output name=SOURCE_OWNER::$(echo $SOURCE_OWNER)"
+          export SOURCE_REPO="$(echo $SOURCE_URL | awk -F '/' '{print $(NF)}')"
+          echo "SOURCE_REPO=$SOURCE_REPO" >> $GITHUB_ENV
+          echo "::set-output name=SOURCE_REPO::$(echo $SOURCE_REPO)"
+          export TARGET=$(cat .config | grep CONFIG_TARGET_BOARD | awk -F '"' '{print $2}')
+          echo "TARGET=$TARGET" >> $GITHUB_ENV
+          echo "::set-output name=TARGET::$(echo $TARGET)"
+          export SUBTARGET=$(cat .config | grep CONFIG_TARGET_SUBTARGET | awk -F '"' '{print $2}')
+          echo "SUBTARGET=$SUBTARGET" >> $GITHUB_ENV
+          echo "::set-output name=SUBTARGET::$(echo $SUBTARGET)"
+          export PLATFORM=$(cat .config | grep CONFIG_TARGET_ARCH_PACKAGES | awk -F '"' '{print $2}')
+          echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
+          echo "::set-output name=PLATFORM::$(echo $PLATFORM)"
+          export TOOLCHAIN_IMAGE="toolchain-$SOURCE_OWNER-$SOURCE_REPO-$SOURCE_BRANCH-$TARGET-$SUBTARGET"
+          echo "TOOLCHAIN_IMAGE=$TOOLCHAIN_IMAGE" >> $GITHUB_ENV
+          echo "::set-output name=TOOLCHAIN_IMAGE::$(echo $TOOLCHAIN_IMAGE)"
+
+      - name: Compare Toolchain Hash
+        id: hash
+        run: |
+          cd $OPENWRTROOT
+          export CURRENT_HASH=$(git log --pretty=tformat:"%H" -n1 tools toolchain)
+          echo "CURRENT_HASH=$CURRENT_HASH" >> $GITHUB_ENV
+          echo "::set-output name=CURRENT_HASH::$(echo $CURRENT_HASH)"
+          echo "CURRENT_HASH is $CURRENT_HASH"
+          export CACHE_HASH=$(cat /data/toolchain/$TOOLCHAIN_IMAGE.hash)
+          echo "CACHE_HASH is $CACHE_HASH"
+          if [ -z "$CACHE_HASH" ] || [ "$CURRENT_HASH" != "$CACHE_HASH" ]; then
+            echo "::set-output name=REBUILD_TOOLCHAIN::true"
+          fi
+
+      - name: Install Feeds
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        run: |
+          cd $OPENWRTROOT
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Compile Tools
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        run: |
+          cd $OPENWRTROOT
+          echo -e "$(nproc) thread compile"
+          make tools/compile -j$(nproc) || make tools/compile -j1 V=s
+
+      - name: Compile Toolchain
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        run: |
+          cd $OPENWRTROOT
+          echo -e "$(nproc) thread compile"
+          make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
+          rm -rf .config* bin dl
+
+      - name: Collect Logs
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        run: |
+          mkdir -p output/logs
+          mv $OPENWRTROOT/logs output/logs/${{ github.job }}
+
+      - name: Upload Logs
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        uses: actions/upload-artifact@main
+        with:
+          name: Logs-${{ github.job }}
+          path: output/logs/${{ github.job }}
+
+      - name: Generate Toolchain Image
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        run: |
+          mksquashfs openwrt /data/toolchain/$TOOLCHAIN_IMAGE.img -force-gid 1000 -force-uid 1000 -comp lz4
+          echo $CURRENT_HASH > /data/toolchain/$TOOLCHAIN_IMAGE.hash
+
+      - name: Failure Process
+        if: failure()
+        run: |
+          sync
+          sudo umount $OPENWRTROOT || true
+          sudo umount $GITHUB_WORKSPACE/openwrt-ro || true
+
+  Firmware:
+    needs: [Toolchain]
+    runs-on: project-rpi2
+
+    steps:
+      - name: Restore Variables
+        run: |
+          echo "CURRENT_BRANCH=$(echo '${{needs.Toolchain.outputs.CURRENT_BRANCH}}')" >> $GITHUB_ENV
+          echo "OPENWRTROOT=$(echo '${{needs.Toolchain.outputs.OPENWRTROOT}}')" >> $GITHUB_ENV
+          echo "SOURCE_OWNER=$(echo '${{needs.Toolchain.outputs.SOURCE_OWNER}}')" >> $GITHUB_ENV
+          echo "SOURCE_REPO=$(echo '${{needs.Toolchain.outputs.SOURCE_REPO}}')" >> $GITHUB_ENV
+          echo "PLATFORM=$(echo '${{needs.Toolchain.outputs.PLATFORM}}')" >> $GITHUB_ENV
+          echo "TARGET=$(echo '${{needs.Toolchain.outputs.TARGET}}')" >> $GITHUB_ENV
+          echo "SUBTARGET=$(echo '${{needs.Toolchain.outputs.SUBTARGET}}')" >> $GITHUB_ENV
+          echo "TOOLCHAIN_IMAGE=$(echo '${{needs.Toolchain.outputs.TOOLCHAIN_IMAGE}}')" >> $GITHUB_ENV
+
+      - name: Initialization Environment
+        run: |
+          rm -rf $OPENWRTROOT
+          mkdir -p openwrt-ro openwrt workdir overlay
+          sudo mount -o loop /data/toolchain/$TOOLCHAIN_IMAGE.img openwrt-ro
+          sudo mount -t overlay overlay -o lowerdir=openwrt-ro,upperdir=overlay,workdir=workdir openwrt
+          sudo chown suling:suling $OPENWRTROOT
+          cd $OPENWRTROOT
+          git pull
+
+      - name: Load Custom Configuration
+        run: |
+          [ -e files ] && mv files $OPENWRTROOT/files
+          [ -e $CONFIG_FILE ] && mv $CONFIG_FILE $OPENWRTROOT/.config
+          cat config/firmware-extra.config >> $OPENWRTROOT/.config
+          chmod +x scripts/*.sh
+          cd $OPENWRTROOT
+          ../$DIY_SH
+          ../scripts/preset-clash-core.sh armv8
+          ../scripts/preset-terminal-tools.sh
+          make defconfig
+
+      - name: Install Feeds
+        run: |
+          cd $OPENWRTROOT
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Download DL Package
+        run: |
+          cd $OPENWRTROOT
+          make download -j64
+
+      - name: Compile Packages
+        run: |
+          cd $OPENWRTROOT
+          echo -e "$(nproc) thread compile"
+          make buildinfo
+          make diffconfig buildversion feedsversion
+          make target/compile -j$(nproc) 'IGNORE_ERRORS=n m' BUILD_LOG=1 || make target/compile -j1 V=s IGNORE_ERRORS=1
+          make package/compile -j$(nproc) 'IGNORE_ERRORS=n m' BUILD_LOG=1 || make package/compile -j1 V=s
+          make package/index
+
+      - name: Generate Firmware
+        run: |
+          cd data/opkg
+          sed -i "s/subtarget/$SUBTARGET/g" distfeeds.conf
+          sed -i "s/target\//$TARGET\//g" distfeeds.conf
+          sed -i "s/platform/$PLATFORM/g" distfeeds.conf
+          cd $OPENWRTROOT
+          echo "dtparam=i2c_arm=on,audio=on" >> target/linux/bcm27xx/image/config.txt
+          mkdir -p files/etc/uci-defaults/
+          cp ../scripts/init-settings.sh files/etc/uci-defaults/99-init-settings
+          mkdir -p files/www/snapshots
+          cp -r bin/targets files/www/snapshots
+          mkdir -p files/etc/opkg
+          cp ../data/opkg/distfeeds.conf files/etc/opkg
+          mkdir -p files/www/ipv6-modules
+          cp bin/packages/$PLATFORM/luci/luci-proto-ipv6* files/www/ipv6-modules
+          cp bin/packages/$PLATFORM/base/{ipv6helper*,odhcpd-ipv6only*,odhcp6c*,6in4*} "files/www/ipv6-modules"
+          cp bin/targets/$TARGET/$SUBTARGET/packages/{ip6tables*,kmod-nf-nat6*,kmod-ipt-nat6*,kmod-sit*,kmod-ip6tables-extra*} "files/www/ipv6-modules"
+          mkdir -p files/bin
+          cp ../scripts/ipv6-helper.sh files/bin/ipv6-helper
+          make package/install -j$(nproc) BUILD_LOG=1 || make package/install -j1 V=s
+          make target/install -j$(nproc) BUILD_LOG=1 || make target/install -j1 V=s
+          make json_overview_image_info
+          make checksum
+          mkdir -p ../output/bin/targets/$TARGET
+          cp -r bin/targets/$TARGET/$SUBTARGET ../output/bin/targets/$TARGET
+
+      - name: Collect Logs
+        if: always()
+        run: |
+          mkdir -p output/logs
+          mv $OPENWRTROOT/logs output/logs/${{ github.job }}
+
+      - name: Upload Logs
+        if: always()
+        uses: actions/upload-artifact@main
+        with:
+          name: Logs-${{ github.job }}
+          path: output/logs/${{ github.job }}
+
+      - name: Failure Process
+        if: failure()
+        run: |
+          sync
+          sudo umount $OPENWRTROOT || true
+          sudo umount $GITHUB_WORKSPACE/openwrt-ro || true
+
+  Extra-Packages:
+    needs: [Toolchain, Firmware]
+    runs-on: project-rpi2
+
+    steps:
+      - name: Restore Variables
+        run: |
+          echo "CURRENT_BRANCH=$(echo '${{needs.Toolchain.outputs.CURRENT_BRANCH}}')" >> $GITHUB_ENV
+          echo "OPENWRTROOT=$(echo '${{needs.Toolchain.outputs.OPENWRTROOT}}')" >> $GITHUB_ENV
+          echo "SOURCE_OWNER=$(echo '${{needs.Toolchain.outputs.SOURCE_OWNER}}')" >> $GITHUB_ENV
+          echo "SOURCE_REPO=$(echo '${{needs.Toolchain.outputs.SOURCE_REPO}}')" >> $GITHUB_ENV
+          echo "PLATFORM=$(echo '${{needs.Toolchain.outputs.PLATFORM}}')" >> $GITHUB_ENV
+          echo "TARGET=$(echo '${{needs.Toolchain.outputs.TARGET}}')" >> $GITHUB_ENV
+          echo "SUBTARGET=$(echo '${{needs.Toolchain.outputs.SUBTARGET}}')" >> $GITHUB_ENV
+          echo "TOOLCHAIN_IMAGE=$(echo '${{needs.Toolchain.outputs.TOOLCHAIN_IMAGE}}')" >> $GITHUB_ENV
+
+      - name: Compile Extra Packages
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          cd $OPENWRTROOT
+          rm -f .config
+          cp ../$CONFIG_FILE ./.config
+          cat ../config/packages-extra.config >> $OPENWRTROOT/.config
+          make defconfig
+          make target/clean
+          make package/libs/mbedtls/clean
+          make target/compile -j$(nproc) IGNORE_ERRORS="m n" BUILD_LOG=1 || make target/compile -j1 V=s IGNORE_ERRORS="m n"
+          make package/compile -j$(nproc) BUILD_LOG=1 IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
+          make package/index
+          mkdir -p ../output/bin/packages
+          cp -r bin/packages/$PLATFORM ../output/bin/packages
+
+      - name: Collect Logs
+        if: always()
+        run: |
+          mv $OPENWRTROOT/logs output/logs/${{ github.job }}
+          mv output/logs output/bin/targets/$TARGET/$SUBTARGET
+
+      - name: Compress Bin Folder
+        run: |
+          cd output
+          zip -q -s 500m -r bin-archive.zip bin
+
+      - name: Upload Bin Archive
+        uses: actions/upload-artifact@main
+        with:
+          name: Bin-Archive
+          path: output
+
+      - name: Upload Logs
+        if: always()
+        uses: actions/upload-artifact@main
+        with:
+          name: Logs-${{ github.job }}
+          path: output/logs/${{ github.job }}
+
+      - name: Umount & Clean
+        if: always()
+        run: |
+          sync
+          sudo umount $OPENWRTROOT || true
+          sudo umount $GITHUB_WORKSPACE/openwrt-ro || true
+          sudo rm -rf openwrt-ro openwrt workdir overlay || true
+
+  Upload:
+    needs: [Toolchain, Firmware, Extra-Packages]
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Restore Variables
+        run: |
+          sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+          echo "CURRENT_BRANCH=$(echo '${{needs.Toolchain.outputs.CURRENT_BRANCH}}')" >> $GITHUB_ENV
+          echo "OPENWRTROOT=$(echo '${{needs.Toolchain.outputs.OPENWRTROOT}}')" >> $GITHUB_ENV
+          echo "SOURCE_OWNER=$(echo '${{needs.Toolchain.outputs.SOURCE_OWNER}}')" >> $GITHUB_ENV
+          echo "SOURCE_REPO=$(echo '${{needs.Toolchain.outputs.SOURCE_REPO}}')" >> $GITHUB_ENV
+          echo "PLATFORM=$(echo '${{needs.Toolchain.outputs.PLATFORM}}')" >> $GITHUB_ENV
+          echo "TARGET=$(echo '${{needs.Toolchain.outputs.TARGET}}')" >> $GITHUB_ENV
+          echo "SUBTARGET=$(echo '${{needs.Toolchain.outputs.SUBTARGET}}')" >> $GITHUB_ENV
+          echo "TOOLCHAIN_IMAGE=$(echo '${{needs.Toolchain.outputs.TOOLCHAIN_IMAGE}}')" >> $GITHUB_ENV
+
+      - name: Download Bin Archive
+        uses: actions/download-artifact@v2
+        with:
+          name: Bin-Archive
+          path: ${{ env.OPENWRTROOT }}
+
+      - name: Decompress Bin Folder
+        run: |
+          cd $OPENWRTROOT
+          zip -q -s 0 bin-archive.zip --out $TARGET-$SUBTARGET.zip
+          unzip $TARGET-$SUBTARGET.zip
+
+      - name: Deploy Files To HostHatch Node
+        env:
+          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
+          SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          SOURCE_PACKAGES: "openwrt/bin/packages/${{ env.PLATFORM }}/"
+          DEST_TARGETS: "${{ env.WEBROOT }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          DEST_PACKAGES: "${{ env.WEBROOT }}/snapshots/packages/${{ env.PLATFORM }}/"
+          REMOTE_PRIVATEKEY: "${{secrets.HOSTHATCH_PRIVATEKEY}}"
+        if: env.REMOTE_PRIVATEKEY != null
+        run: |
+          mkdir -p ~/.ssh/
+          install -m 600 /dev/null ~/.ssh/id_rsa
+          echo "${{secrets.HOSTHATCH_PRIVATEKEY}}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
+          bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET \
+          $WEBROOT/snapshots/packages/$PLATFORM'"
+          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
+          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
+
+      - name: Deploy Files To PacificRack Node
+        env:
+          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.PACIFICRACK_IP }}"
+          SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          SOURCE_PACKAGES: "openwrt/bin/packages/${{ env.PLATFORM }}/"
+          DEST_TARGETS: "${{ env.WEBROOT }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          DEST_PACKAGES: "${{ env.WEBROOT }}/snapshots/packages/${{ env.PLATFORM }}/"
+          REMOTE_PRIVATEKEY: "${{secrets.PACIFICRACK_PRIVATEKEY}}"
+        if: env.REMOTE_PRIVATEKEY != null
+        run: |
+          mkdir -p ~/.ssh/
+          install -m 600 /dev/null ~/.ssh/id_rsa
+          echo "${{secrets.PACIFICRACK_PRIVATEKEY}}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
+          bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET \
+          $WEBROOT/snapshots/packages/$PLATFORM'"
+          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
+          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
+
+      - name: Organize Files
+        run: |
+          cd $OPENWRTROOT/bin/targets/$TARGET/$SUBTARGET
+          rm -rf packages logs
+
+      - name: Deploy Files To Release
+        uses: ncipollo/release-action@v1.8.0
+        if: env.FIRMWARE_RELEASE_UPLOAD == 'true'
+        with:
+          name: openwrt-${{ env.TARGET }}-${{ env.SUBTARGET }}
+          allowUpdates: true
+          replacesArtifacts: true
+          tag: ${{ env.TARGET }}-${{ env.SUBTARGET }}
+          commit: ${{ env.CURRENT_BRANCH }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: ${{ env.OPENWRTROOT }}/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/*
+
+      - name: Deploy Files To Onedrive
+        env:
+          SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}"
+          DEST_TARGETS: "snapshots/targets/${{ env.TARGET }}"
+          ONEDRIVEUPLOADER_CONF: "${{ secrets.ONEDRIVEUPLOADER_CONF }}"
+        if: env.ONEDRIVEUPLOADER_CONF != null
+        run: |
+          echo -e "${ONEDRIVEUPLOADER_CONF}" | tee ./auth.json > /dev/null
+          wget -q https://raw.githubusercontent.com/MoeClub/OneList/master/OneDriveUploader/amd64/linux/OneDriveUploader
+          chmod +x OneDriveUploader
+          rm -rf $SOURCE_TARGETS/packages $SOURCE_TARGETS/logs
+          ./OneDriveUploader -f -c "./auth.json" -s $SOURCE_TARGETS -r $DEST_TARGETS
+          ./OneDriveUploader -f -c "./auth.json" -s $SOURCE_TARGETS -r "archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET/$SUBTARGET"
+          ./OneDriveUploader -f -c "./auth.json" -s $OPENWRTROOT/$TARGET-$SUBTARGET.zip -r "archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/bin-archive"

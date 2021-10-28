@@ -140,6 +140,7 @@ jobs:
       - name: Generate Toolchain Image
         if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
         run: |
+          mkdir -p /data/toolchain
           mksquashfs openwrt /data/toolchain/$TOOLCHAIN_IMAGE.img -force-gid 1000 -force-uid 1000 -comp lz4
           echo $CURRENT_HASH > /data/toolchain/$TOOLCHAIN_IMAGE.hash
 

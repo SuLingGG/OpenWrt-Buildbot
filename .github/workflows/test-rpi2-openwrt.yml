@@ -56,7 +56,7 @@ jobs:
 
       - name: Generate Toolchain Config
         run: |
-          [ -e $CONFIG_FILE ] && mv $CONFIG_FILE $OPENWRTROOT/.config
+          [ -e $CONFIG_FILE ] && cp $CONFIG_FILE $OPENWRTROOT/.config
           echo -e "\nCONFIG_ALL=y" >> $OPENWRTROOT/.config
           echo -e "\nCONFIG_ALL_NONSHARED=y" >> $OPENWRTROOT/.config
           cd $OPENWRTROOT
@@ -108,6 +108,7 @@ jobs:
           cd $OPENWRTROOT
           ./scripts/feeds update -a
           ./scripts/feeds install -a
+          make defconfig > /dev/null 2>&1
 
       - name: Compile Tools
         if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
@@ -180,7 +181,7 @@ jobs:
       - name: Load Custom Configuration
         run: |
           [ -e files ] && mv files $OPENWRTROOT/files
-          [ -e $CONFIG_FILE ] && mv $CONFIG_FILE $OPENWRTROOT/.config
+          [ -e $CONFIG_FILE ] && cp $CONFIG_FILE $OPENWRTROOT/.config
           cat config/firmware-extra.config >> $OPENWRTROOT/.config
           chmod +x scripts/*.sh
           cd $OPENWRTROOT

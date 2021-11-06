@@ -151,6 +151,7 @@ jobs:
           sync
           sudo umount $OPENWRTROOT || true
           sudo umount $GITHUB_WORKSPACE/openwrt-ro || true
+          sudo rm -rf $GITHUB_WORKSPACE/* $GITHUB_WORKSPACE/.* || true
 
   Firmware:
     needs: [Toolchain]
@@ -257,6 +258,7 @@ jobs:
           sync
           sudo umount $OPENWRTROOT || true
           sudo umount $GITHUB_WORKSPACE/openwrt-ro || true
+          sudo rm -rf $GITHUB_WORKSPACE/* $GITHUB_WORKSPACE/.* || true
 
   Extra-Packages:
     needs: [Toolchain, Firmware]
@@ -300,7 +302,7 @@ jobs:
       - name: Compress Bin Folder
         run: |
           cd output
-          zip -q -s 500m -r bin-archive.zip bin
+          zip -q -s 1900m -r bin-archive.zip bin
 
       - name: Upload Bin Archive
         uses: actions/upload-artifact@main
@@ -321,8 +323,8 @@ jobs:
           sync
           sudo umount $OPENWRTROOT || true
           sudo umount $GITHUB_WORKSPACE/openwrt-ro || true
-          sudo rm -rf openwrt-ro openwrt workdir overlay || true
-
+          sudo rm -rf $GITHUB_WORKSPACE/* $GITHUB_WORKSPACE/.* || true
+          
   Upload:
     needs: [Toolchain, Firmware, Extra-Packages]
     runs-on: ubuntu-20.04
@@ -332,7 +334,6 @@ jobs:
         run: |
           sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
           echo "CURRENT_BRANCH=$(echo '${{needs.Toolchain.outputs.CURRENT_BRANCH}}')" >> $GITHUB_ENV
-          echo "OPENWRTROOT=$(echo '${{needs.Toolchain.outputs.OPENWRTROOT}}')" >> $GITHUB_ENV
           echo "SOURCE_OWNER=$(echo '${{needs.Toolchain.outputs.SOURCE_OWNER}}')" >> $GITHUB_ENV
           echo "SOURCE_REPO=$(echo '${{needs.Toolchain.outputs.SOURCE_REPO}}')" >> $GITHUB_ENV
           echo "PLATFORM=$(echo '${{needs.Toolchain.outputs.PLATFORM}}')" >> $GITHUB_ENV
@@ -344,11 +345,13 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: Bin-Archive
-          path: ${{ env.OPENWRTROOT }}
+          path: openwrt
 
       - name: Decompress Bin Folder
         run: |
-          cd $OPENWRTROOT
+          cd openwrt
+          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
+          echo "::set-output name=OPENWRTROOT::$(echo $PWD)"
           zip -q -s 0 bin-archive.zip --out $TARGET-$SUBTARGET.zip
           unzip $TARGET-$SUBTARGET.zip
 

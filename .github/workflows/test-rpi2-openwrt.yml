@@ -191,7 +191,7 @@ jobs:
 
       - name: Initialization Environment
         run: |
-          rm -rf $OPENWRT_ROOT_PATH
+          rm -rf $OPENWRT_ROOT_PATH/* $OPENWRT_ROOT_PATH/.*
           mkdir -p openwrt-ro openwrt workdir overlay
           sudo mount -o loop /data/toolchain/$TOOLCHAIN_IMAGE.img openwrt-ro
           sudo mount -t overlay overlay -o lowerdir=openwrt-ro,upperdir=overlay,workdir=workdir openwrt

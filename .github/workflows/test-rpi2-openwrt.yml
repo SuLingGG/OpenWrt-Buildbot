@@ -169,8 +169,7 @@ jobs:
           sync
           sudo umount ${OPENWRT_LOOP_DEVNAME}p1 || true
           sudo losetup -d $OPENWRT_LOOP_DEVNAME || true
-          cd /
-          sudo rm -rf $GITHUB_WORKSPACE/* $GITHUB_WORKSPACE/.* || true
+          ls -A | xargs rm -rf || true
 
   Firmware:
     needs: [Toolchain]
@@ -191,7 +190,7 @@ jobs:
 
       - name: Initialization Environment
         run: |
-          rm -rf $OPENWRT_ROOT_PATH/* $OPENWRT_ROOT_PATH/.*
+          rm -rf $OPENWRT_ROOT_PATH/* $OPENWRT_ROOT_PATH/.git
           mkdir -p openwrt-ro openwrt workdir overlay
           sudo mount -o loop /data/toolchain/$TOOLCHAIN_IMAGE.img openwrt-ro
           sudo mount -t overlay overlay -o lowerdir=openwrt-ro,upperdir=overlay,workdir=workdir openwrt
@@ -279,8 +278,7 @@ jobs:
           sudo umount $OPENWRT_ROOT_PATH || true
           sudo umount $GITHUB_WORKSPACE/openwrt-ro || true
           sudo losetup -d $OPENWRT_LOOP_DEVNAME || true
-          cd /
-          sudo rm -rf $GITHUB_WORKSPACE/* $GITHUB_WORKSPACE/.* || true
+          ls -A | xargs rm -rf || true
 
   Extra-Packages:
     needs: [Toolchain, Firmware]
@@ -347,8 +345,7 @@ jobs:
           sudo umount $OPENWRT_ROOT_PATH || true
           sudo umount $GITHUB_WORKSPACE/openwrt-ro || true
           sudo losetup -d $OPENWRT_LOOP_DEVNAME || true
-          cd /
-          sudo rm -rf $GITHUB_WORKSPACE/* $GITHUB_WORKSPACE/.* || true
+          ls -A | xargs rm -rf || true
 
   Upload:
     needs: [Toolchain, Firmware, Extra-Packages]

@@ -59,6 +59,7 @@ jobs:
           export OPENWRT_LOOPNAME="$(sudo losetup -f -P --show openwrt.img)"
           sudo mkfs.btrfs ${OPENWRT_LOOPNAME}p1
           sudo mount -o nossd,compress=zstd ${OPENWRT_LOOPNAME}p1 openwrt
+          sudo chown suling:suling $OPENWRTROOT
 
       - name: Clone Source Code
         id: clone
@@ -163,6 +164,8 @@ jobs:
       - name: Clean Process
         if: failure()
         run: |
+          sync
+          sudo umount ${OPENWRT_LOOPNAME}p1 || true
           sudo rm -rf $GITHUB_WORKSPACE/* $GITHUB_WORKSPACE/.* || true
 
   Firmware:

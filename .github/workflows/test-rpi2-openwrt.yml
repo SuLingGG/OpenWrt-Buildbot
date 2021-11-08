@@ -53,6 +53,12 @@ jobs:
           sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804)
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
+          mkdir openwrt
+          fallocate -l 150G openwrt.img
+          echo 'type=83' | sfdisk openwrt.img
+          export OPENWRT_LOOPNAME="$(sudo losetup -f -P --show openwrt.img)"
+          sudo mkfs.btrfs ${OPENWRT_LOOPNAME}p1
+          sudo mount -o nossd,compress=zstd ${OPENWRT_LOOPNAME}p1 openwrt
 
       - name: Clone Source Code
         id: clone
@@ -138,7 +144,7 @@ jobs:
         if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
         run: |
           mkdir -p output/logs
-          mv $OPENWRTROOT/logs output/logs/${{ github.job }}
+          mv $OPENWRTROOT/logs output/logs/${{ github.job }} || true
 
       - name: Upload Logs
         if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
@@ -180,12 +186,6 @@ jobs:
           rm -rf $OPENWRTROOT
           mkdir -p openwrt-ro openwrt workdir overlay
           sudo mount -o loop /data/toolchain/$TOOLCHAIN_IMAGE.img openwrt-ro
-          fallocate -l 150G overlay.img
-          echo 'type=83' | sfdisk overlay.img
-          export OVERLAY_DEVNAME="$(sudo losetup -f -P --show overlay.img)"
-          sudo mkfs.btrfs ${OVERLAY_DEVNAME}p1
-          sudo mount -o nossd,compress=zstd ${OVERLAY_DEVNAME}p1 overlay
-          sudo chown suling:suling overlay
           sudo mount -t overlay overlay -o lowerdir=openwrt-ro,upperdir=overlay,workdir=workdir openwrt
           sudo chown suling:suling $OPENWRTROOT
           cd $OPENWRTROOT
@@ -255,7 +255,7 @@ jobs:
         if: always()
         run: |
           mkdir -p output/logs
-          mv $OPENWRTROOT/logs output/logs/${{ github.job }}
+          mv $OPENWRTROOT/logs output/logs/${{ github.job }} || true
 
       - name: Upload Logs
         if: always()
@@ -309,8 +309,8 @@ jobs:
       - name: Collect Logs
         if: always()
         run: |
-          mv $OPENWRTROOT/logs output/logs/${{ github.job }}
-          mv output/logs output/bin/targets/$TARGET/$SUBTARGET
+          mv $OPENWRTROOT/logs output/logs/${{ github.job }} || true
+          mv output/logs output/bin/targets/$TARGET/$SUBTARGET || true
 
       - name: Compress Bin Folder
         run: |

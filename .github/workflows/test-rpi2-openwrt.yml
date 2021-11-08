@@ -183,8 +183,8 @@ jobs:
           fallocate -l 150G overlay.img
           echo 'type=83' | sfdisk overlay.img
           export OVERLAY_DEVNAME="$(sudo losetup -f -P --show overlay.img)"
-          sudo mkfs.btrfs ${OOVERLAY_DEVNAME}p1
-          sudo mount -o nossd,compress=zstd ${OOVERLAY_DEVNAME}p1 overlay
+          sudo mkfs.btrfs ${OVERLAY_DEVNAME}p1
+          sudo mount -o nossd,compress=zstd ${OVERLAY_DEVNAME}p1 overlay
           sudo chown suling:suling overlay
           sudo mount -t overlay overlay -o lowerdir=openwrt-ro,upperdir=overlay,workdir=workdir openwrt
           sudo chown suling:suling $OPENWRTROOT

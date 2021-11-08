@@ -24,7 +24,6 @@ env:
   TOOLCHAIN_TAG: toolchain
   TOOLCHAIN_RELEASE_UPLOAD: true
   FIRMWARE_RELEASE_UPLOAD: true
-  RUNNER: project-rpi2
   TZ: Asia/Shanghai
 
 jobs:
@@ -32,7 +31,8 @@ jobs:
     runs-on: project-rpi2
 
     outputs:
-      OPENWRTROOT: ${{ steps.clone.outputs.OPENWRTROOT }}
+      OPENWRT_LOOP_DEVNAME: ${{ steps.init.outputs.OPENWRT_LOOP_DEVNAME }}
+      OPENWRT_ROOT_PATH: ${{ steps.init.outputs.OPENWRT_ROOT_PATH }}
       CURRENT_BRANCH: ${{ steps.env.outputs.CURRENT_BRANCH }}
       SOURCE_OWNER: ${{ steps.env.outputs.SOURCE_OWNER }}
       SOURCE_REPO: ${{ steps.env.outputs.SOURCE_REPO }}
@@ -46,6 +46,7 @@ jobs:
         uses: actions/checkout@main
 
       - name: Initialization Environment
+        id: init
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
@@ -56,26 +57,27 @@ jobs:
           mkdir openwrt
           fallocate -l 150G openwrt.img
           echo 'type=83' | sfdisk openwrt.img
-          export OPENWRT_LOOPNAME="$(sudo losetup -f -P --show openwrt.img)"
-          sudo mkfs.btrfs ${OPENWRT_LOOPNAME}p1
-          sudo mount -o nossd,compress=zstd ${OPENWRT_LOOPNAME}p1 openwrt
-          sudo chown suling:suling $OPENWRTROOT
+          export OPENWRT_LOOP_DEVNAME="$(sudo losetup -f -P --show openwrt.img)"
+          echo "OPENWRT_LOOP_DEVNAME=$OPENWRT_LOOP_DEVNAME" >> $GITHUB_ENV
+          echo "::set-output name=OPENWRT_LOOP_DEVNAME::$(echo $OPENWRT_LOOP_DEVNAME)"
+          sudo mkfs.btrfs ${OPENWRT_LOOP_DEVNAME}p1
+          sudo mount -o nossd,compress=zstd ${OPENWRT_LOOP_DEVNAME}p1 openwrt
+          sudo chown suling:suling $OPENWRT_ROOT_PATH
+          cd openwrt
+          echo "OPENWRT_ROOT_PATH=$PWD" >> $GITHUB_ENV
+          echo "::set-output name=OPENWRT_ROOT_PATH::$(echo $PWD)"
 
       - name: Clone Source Code
-        id: clone
         run: |
           df -hT $PWD
-          git clone $SOURCE_URL -b $SOURCE_BRANCH openwrt
-          cd openwrt
-          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
-          echo "::set-output name=OPENWRTROOT::$(echo $PWD)"
+          git clone $SOURCE_URL -b $SOURCE_BRANCH $OPENWRT_ROOT_PATH
 
       - name: Generate Toolchain Config
         run: |
-          [ -e $CONFIG_FILE ] && cp $CONFIG_FILE $OPENWRTROOT/.config
-          echo -e "\nCONFIG_ALL=y" >> $OPENWRTROOT/.config
-          echo -e "\nCONFIG_ALL_NONSHARED=y" >> $OPENWRTROOT/.config
-          cd $OPENWRTROOT
+          [ -e $CONFIG_FILE ] && cp $CONFIG_FILE $OPENWRT_ROOT_PATH/.config
+          echo -e "\nCONFIG_ALL=y" >> $OPENWRT_ROOT_PATH/.config
+          echo -e "\nCONFIG_ALL_NONSHARED=y" >> $OPENWRT_ROOT_PATH/.config
+          cd $OPENWRT_ROOT_PATH
           make defconfig > /dev/null 2>&1
 
       - name: Generate Variables
@@ -84,7 +86,7 @@ jobs:
           export CURRENT_BRANCH="$(git symbolic-ref --short HEAD)"
           echo "CURRENT_BRANCH=$CURRENT_BRANCH" >> $GITHUB_ENV
           echo "::set-output name=CURRENT_BRANCH::$(echo $CURRENT_BRANCH)"
-          cd $OPENWRTROOT
+          cd $OPENWRT_ROOT_PATH
           export SOURCE_OWNER="$(echo $SOURCE_URL | awk -F '/' '{print $(NF-1)}')"
           echo "SOURCE_OWNER=$SOURCE_OWNER" >> $GITHUB_ENV
           echo "::set-output name=SOURCE_OWNER::$(echo $SOURCE_OWNER)"
@@ -107,7 +109,7 @@ jobs:
       - name: Compare Toolchain Hash
         id: hash
         run: |
-          cd $OPENWRTROOT
+          cd $OPENWRT_ROOT_PATH
           export CURRENT_HASH=$(git log --pretty=tformat:"%H" -n1 tools toolchain)
           echo "CURRENT_HASH=$CURRENT_HASH" >> $GITHUB_ENV
           echo "::set-output name=CURRENT_HASH::$(echo $CURRENT_HASH)"
@@ -121,7 +123,7 @@ jobs:
       - name: Install Feeds
         if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
         run: |
-          cd $OPENWRTROOT
+          cd $OPENWRT_ROOT_PATH
           ./scripts/feeds update -a
           ./scripts/feeds install -a
           make defconfig > /dev/null 2>&1
@@ -129,14 +131,14 @@ jobs:
       - name: Compile Tools
         if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
         run: |
-          cd $OPENWRTROOT
+          cd $OPENWRT_ROOT_PATH
           echo -e "$(nproc) thread compile"
           make tools/compile -j$(nproc) || make tools/compile -j1 V=s
 
       - name: Compile Toolchain
         if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
         run: |
-          cd $OPENWRTROOT
+          cd $OPENWRT_ROOT_PATH
           echo -e "$(nproc) thread compile"
           make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
           rm -rf .config* bin dl
@@ -145,7 +147,7 @@ jobs:
         if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
         run: |
           mkdir -p output/logs
-          mv $OPENWRTROOT/logs output/logs/${{ github.job }} || true
+          mv $OPENWRT_ROOT_PATH/logs output/logs/${{ github.job }} || true
 
       - name: Upload Logs
         if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
@@ -165,7 +167,8 @@ jobs:
         if: failure()
         run: |
           sync
-          sudo umount ${OPENWRT_LOOPNAME}p1 || true
+          sudo umount ${OPENWRT_LOOP_DEVNAME}p1 || true
+          sudo losetup -d $OPENWRT_LOOP_DEVNAME || true
           sudo rm -rf $GITHUB_WORKSPACE/* $GITHUB_WORKSPACE/.* || true
 
   Firmware:
@@ -176,7 +179,7 @@ jobs:
       - name: Restore Variables
         run: |
           echo "CURRENT_BRANCH=$(echo '${{needs.Toolchain.outputs.CURRENT_BRANCH}}')" >> $GITHUB_ENV
-          echo "OPENWRTROOT=$(echo '${{needs.Toolchain.outputs.OPENWRTROOT}}')" >> $GITHUB_ENV
+          echo "OPENWRT_ROOT_PATH=$(echo '${{needs.Toolchain.outputs.OPENWRT_ROOT_PATH}}')" >> $GITHUB_ENV
           echo "SOURCE_OWNER=$(echo '${{needs.Toolchain.outputs.SOURCE_OWNER}}')" >> $GITHUB_ENV
           echo "SOURCE_REPO=$(echo '${{needs.Toolchain.outputs.SOURCE_REPO}}')" >> $GITHUB_ENV
           echo "PLATFORM=$(echo '${{needs.Toolchain.outputs.PLATFORM}}')" >> $GITHUB_ENV
@@ -186,21 +189,21 @@ jobs:
 
       - name: Initialization Environment
         run: |
-          rm -rf $OPENWRTROOT
+          rm -rf $OPENWRT_ROOT_PATH
           mkdir -p openwrt-ro openwrt workdir overlay
           sudo mount -o loop /data/toolchain/$TOOLCHAIN_IMAGE.img openwrt-ro
           sudo mount -t overlay overlay -o lowerdir=openwrt-ro,upperdir=overlay,workdir=workdir openwrt
-          sudo chown suling:suling $OPENWRTROOT
-          cd $OPENWRTROOT
+          sudo chown suling:suling $OPENWRT_ROOT_PATH
+          cd $OPENWRT_ROOT_PATH
           git pull
 
       - name: Load Custom Configuration
         run: |
-          [ -e files ] && mv files $OPENWRTROOT/files
-          [ -e $CONFIG_FILE ] && cp $CONFIG_FILE $OPENWRTROOT/.config
-          cat config/firmware-extra.config >> $OPENWRTROOT/.config
+          [ -e files ] && mv files $OPENWRT_ROOT_PATH/files
+          [ -e $CONFIG_FILE ] && cp $CONFIG_FILE $OPENWRT_ROOT_PATH/.config
+          cat config/firmware-extra.config >> $OPENWRT_ROOT_PATH/.config
           chmod +x scripts/*.sh
-          cd $OPENWRTROOT
+          cd $OPENWRT_ROOT_PATH
           ../$DIY_SH
           ../scripts/preset-clash-core.sh armv8
           ../scripts/preset-terminal-tools.sh
@@ -208,18 +211,18 @@ jobs:
 
       - name: Install Feeds
         run: |
-          cd $OPENWRTROOT
+          cd $OPENWRT_ROOT_PATH
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
       - name: Download DL Package
         run: |
-          cd $OPENWRTROOT
+          cd $OPENWRT_ROOT_PATH
           make download -j64
 
       - name: Compile Packages
         run: |
-          cd $OPENWRTROOT
+          cd $OPENWRT_ROOT_PATH
           echo -e "$(nproc) thread compile"
           make buildinfo
           make diffconfig buildversion feedsversion
@@ -233,7 +236,7 @@ jobs:
           sed -i "s/subtarget/$SUBTARGET/g" distfeeds.conf
           sed -i "s/target\//$TARGET\//g" distfeeds.conf
           sed -i "s/platform/$PLATFORM/g" distfeeds.conf
-          cd $OPENWRTROOT
+          cd $OPENWRT_ROOT_PATH
           echo "dtparam=i2c_arm=on,audio=on" >> target/linux/bcm27xx/image/config.txt
           mkdir -p files/etc/uci-defaults/
           cp ../scripts/init-settings.sh files/etc/uci-defaults/99-init-settings
@@ -258,7 +261,7 @@ jobs:
         if: always()
         run: |
           mkdir -p output/logs
-          mv $OPENWRTROOT/logs output/logs/${{ github.job }} || true
+          mv $OPENWRT_ROOT_PATH/logs output/logs/${{ github.job }} || true
 
       - name: Upload Logs
         if: always()
@@ -271,9 +274,9 @@ jobs:
         if: failure()
         run: |
           sync
-          sudo umount $OPENWRTROOT || true
+          sudo umount $OPENWRT_ROOT_PATH || true
           sudo umount $GITHUB_WORKSPACE/openwrt-ro || true
-          sudo umount $GITHUB_WORKSPACE/overlay || true
+          sudo losetup -d $OPENWRT_LOOP_DEVNAME || true
           sudo rm -rf $GITHUB_WORKSPACE/* $GITHUB_WORKSPACE/.* || true
 
   Extra-Packages:
@@ -284,7 +287,7 @@ jobs:
       - name: Restore Variables
         run: |
           echo "CURRENT_BRANCH=$(echo '${{needs.Toolchain.outputs.CURRENT_BRANCH}}')" >> $GITHUB_ENV
-          echo "OPENWRTROOT=$(echo '${{needs.Toolchain.outputs.OPENWRTROOT}}')" >> $GITHUB_ENV
+          echo "OPENWRT_ROOT_PATH=$(echo '${{needs.Toolchain.outputs.OPENWRT_ROOT_PATH}}')" >> $GITHUB_ENV
           echo "SOURCE_OWNER=$(echo '${{needs.Toolchain.outputs.SOURCE_OWNER}}')" >> $GITHUB_ENV
           echo "SOURCE_REPO=$(echo '${{needs.Toolchain.outputs.SOURCE_REPO}}')" >> $GITHUB_ENV
           echo "PLATFORM=$(echo '${{needs.Toolchain.outputs.PLATFORM}}')" >> $GITHUB_ENV
@@ -296,10 +299,10 @@ jobs:
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          cd $OPENWRTROOT
+          cd $OPENWRT_ROOT_PATH
           rm -f .config
           cp ../$CONFIG_FILE ./.config
-          cat ../config/packages-extra.config >> $OPENWRTROOT/.config
+          cat ../config/packages-extra.config >> $OPENWRT_ROOT_PATH/.config
           make defconfig
           make target/clean
           make package/libs/mbedtls/clean
@@ -312,7 +315,7 @@ jobs:
       - name: Collect Logs
         if: always()
         run: |
-          mv $OPENWRTROOT/logs output/logs/${{ github.job }} || true
+          mv $OPENWRT_ROOT_PATH/logs output/logs/${{ github.job }} || true
           mv output/logs output/bin/targets/$TARGET/$SUBTARGET || true
 
       - name: Compress Bin Folder
@@ -337,9 +340,9 @@ jobs:
         if: always()
         run: |
           sync
-          sudo umount $OPENWRTROOT || true
+          sudo umount $OPENWRT_ROOT_PATH || true
           sudo umount $GITHUB_WORKSPACE/openwrt-ro || true
-          sudo umount $GITHUB_WORKSPACE/overlay || true
+          sudo losetup -d $OPENWRT_LOOP_DEVNAME || true
           sudo rm -rf $GITHUB_WORKSPACE/* $GITHUB_WORKSPACE/.* || true
 
   Upload:
@@ -367,8 +370,8 @@ jobs:
       - name: Decompress Bin Folder
         run: |
           cd openwrt
-          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
-          echo "::set-output name=OPENWRTROOT::$(echo $PWD)"
+          echo "OPENWRT_ROOT_PATH=$PWD" >> $GITHUB_ENV
+          echo "::set-output name=OPENWRT_ROOT_PATH::$(echo $PWD)"
           zip -q -s 0 bin-archive.zip --out $TARGET-$SUBTARGET.zip
           unzip $TARGET-$SUBTARGET.zip
 
@@ -414,7 +417,7 @@ jobs:
 
       - name: Organize Files
         run: |
-          cd $OPENWRTROOT/bin/targets/$TARGET/$SUBTARGET
+          cd $OPENWRT_ROOT_PATH/bin/targets/$TARGET/$SUBTARGET
           rm -rf packages logs
 
       - name: Deploy Files To Release
@@ -427,7 +430,7 @@ jobs:
           tag: ${{ env.TARGET }}-${{ env.SUBTARGET }}
           commit: ${{ env.CURRENT_BRANCH }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          artifacts: ${{ env.OPENWRTROOT }}/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/*
+          artifacts: ${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/*
 
       - name: Deploy Files To Onedrive
         env:
@@ -442,4 +445,4 @@ jobs:
           rm -rf $SOURCE_TARGETS/packages $SOURCE_TARGETS/logs
           ./OneDriveUploader -f -c "./auth.json" -s $SOURCE_TARGETS -r $DEST_TARGETS
           ./OneDriveUploader -f -c "./auth.json" -s $SOURCE_TARGETS -r "archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET/$SUBTARGET"
-          ./OneDriveUploader -f -c "./auth.json" -s $OPENWRTROOT/$TARGET-$SUBTARGET.zip -r "archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/bin-archive"
+          ./OneDriveUploader -f -c "./auth.json" -s $OPENWRT_ROOT_PATH/$TARGET-$SUBTARGET.zip -r "archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/bin-archive"

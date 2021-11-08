@@ -62,7 +62,7 @@ jobs:
           echo "::set-output name=OPENWRT_LOOP_DEVNAME::$(echo $OPENWRT_LOOP_DEVNAME)"
           sudo mkfs.btrfs ${OPENWRT_LOOP_DEVNAME}p1
           sudo mount -o nossd,compress=zstd ${OPENWRT_LOOP_DEVNAME}p1 openwrt
-          sudo chown suling:suling $OPENWRT_ROOT_PATH
+          sudo chown suling:suling openwrt
           cd openwrt
           echo "OPENWRT_ROOT_PATH=$PWD" >> $GITHUB_ENV
           echo "::set-output name=OPENWRT_ROOT_PATH::$(echo $PWD)"
@@ -178,8 +178,9 @@ jobs:
     steps:
       - name: Restore Variables
         run: |
-          echo "CURRENT_BRANCH=$(echo '${{needs.Toolchain.outputs.CURRENT_BRANCH}}')" >> $GITHUB_ENV
+          echo "OPENWRT_LOOP_DEVNAME=$(echo '${{needs.Toolchain.outputs.OPENWRT_LOOP_DEVNAME}}')" >> $GITHUB_ENV
           echo "OPENWRT_ROOT_PATH=$(echo '${{needs.Toolchain.outputs.OPENWRT_ROOT_PATH}}')" >> $GITHUB_ENV
+          echo "CURRENT_BRANCH=$(echo '${{needs.Toolchain.outputs.CURRENT_BRANCH}}')" >> $GITHUB_ENV
           echo "SOURCE_OWNER=$(echo '${{needs.Toolchain.outputs.SOURCE_OWNER}}')" >> $GITHUB_ENV
           echo "SOURCE_REPO=$(echo '${{needs.Toolchain.outputs.SOURCE_REPO}}')" >> $GITHUB_ENV
           echo "PLATFORM=$(echo '${{needs.Toolchain.outputs.PLATFORM}}')" >> $GITHUB_ENV
@@ -286,8 +287,9 @@ jobs:
     steps:
       - name: Restore Variables
         run: |
-          echo "CURRENT_BRANCH=$(echo '${{needs.Toolchain.outputs.CURRENT_BRANCH}}')" >> $GITHUB_ENV
+          echo "OPENWRT_LOOP_DEVNAME=$(echo '${{needs.Toolchain.outputs.OPENWRT_LOOP_DEVNAME}}')" >> $GITHUB_ENV
           echo "OPENWRT_ROOT_PATH=$(echo '${{needs.Toolchain.outputs.OPENWRT_ROOT_PATH}}')" >> $GITHUB_ENV
+          echo "CURRENT_BRANCH=$(echo '${{needs.Toolchain.outputs.CURRENT_BRANCH}}')" >> $GITHUB_ENV
           echo "SOURCE_OWNER=$(echo '${{needs.Toolchain.outputs.SOURCE_OWNER}}')" >> $GITHUB_ENV
           echo "SOURCE_REPO=$(echo '${{needs.Toolchain.outputs.SOURCE_REPO}}')" >> $GITHUB_ENV
           echo "PLATFORM=$(echo '${{needs.Toolchain.outputs.PLATFORM}}')" >> $GITHUB_ENV

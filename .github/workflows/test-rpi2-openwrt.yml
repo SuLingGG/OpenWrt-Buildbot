@@ -169,7 +169,7 @@ jobs:
           sync
           sudo umount ${OPENWRT_LOOP_DEVNAME}p1 || true
           sudo losetup -d $OPENWRT_LOOP_DEVNAME || true
-          ls -A | xargs rm -rf || true
+          ls -A | xargs -I {} rm -rf {} || true
 
   Firmware:
     needs: [Toolchain]
@@ -277,7 +277,7 @@ jobs:
           sudo umount $OPENWRT_ROOT_PATH || true
           sudo umount $GITHUB_WORKSPACE/openwrt-ro || true
           sudo losetup -d $OPENWRT_LOOP_DEVNAME || true
-          ls -A | xargs rm -rf || true
+          ls -A | xargs -I {} rm -rf {} || true
 
   Extra-Packages:
     needs: [Toolchain, Firmware]
@@ -343,7 +343,7 @@ jobs:
           sudo umount $OPENWRT_ROOT_PATH || true
           sudo umount $GITHUB_WORKSPACE/openwrt-ro || true
           sudo losetup -d $OPENWRT_LOOP_DEVNAME || true
-          ls -A | xargs rm -rf || true
+          ls -A | xargs -I {} rm -rf {} || true
 
   Upload:
     needs: [Toolchain, Firmware, Extra-Packages]

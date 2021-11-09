@@ -149,6 +149,7 @@ jobs:
         with:
           name: Logs-${{ github.job }}
           path: $OPENWRT_ROOT_PATH/logs
+          if-no-files-found: ignore
 
       - name: Collect Workflows Logs
         if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
@@ -264,6 +265,7 @@ jobs:
         with:
           name: Logs-${{ github.job }}
           path: $OPENWRT_ROOT_PATH/logs
+          if-no-files-found: ignore
 
       - name: Collect Workflows Logs
         run: |
@@ -319,6 +321,7 @@ jobs:
         with:
           name: Logs-${{ github.job }}
           path: $OPENWRT_ROOT_PATH/logs
+          if-no-files-found: ignore
 
       - name: Collect Workflows Logs
         run: |

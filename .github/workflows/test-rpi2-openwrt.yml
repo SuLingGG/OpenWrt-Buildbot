@@ -16,7 +16,7 @@ on:
   #   types: started
 
 env:
-  CONFIG_FILE: config/bcm27xx/rpi2-openwrt-target.config
+  CONFIG_FILE: config/bcm27xx/bcm2709.config
   SOURCE_URL: https://github.com/immortalwrt/immortalwrt
   SOURCE_BRANCH: openwrt-18.06-k5.4
   DIY_SH: scripts/immortalwrt.sh
@@ -278,6 +278,7 @@ jobs:
           sync
           sudo umount $OPENWRT_ROOT_PATH || true
           sudo umount $GITHUB_WORKSPACE/openwrt-ro || true
+          sudo umount ${OPENWRT_LOOP_DEVNAME}p1 || true
           sudo losetup -d $OPENWRT_LOOP_DEVNAME || true
           ls -A | xargs -I {} rm -rf {} || true
 
@@ -345,6 +346,7 @@ jobs:
           sync
           sudo umount $OPENWRT_ROOT_PATH || true
           sudo umount $GITHUB_WORKSPACE/openwrt-ro || true
+          sudo umount ${OPENWRT_LOOP_DEVNAME}p1 || true
           sudo losetup -d $OPENWRT_LOOP_DEVNAME || true
           ls -A | xargs -I {} rm -rf {} || true
 
@@ -380,8 +382,8 @@ jobs:
       - name: Deploy Files To HostHatch Node
         env:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
-          SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
-          SOURCE_PACKAGES: "openwrt/bin/packages/${{ env.PLATFORM }}/"
+          SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          SOURCE_PACKAGES: "${{ env.OPENWRT_ROOT_PATH }}/bin/packages/${{ env.PLATFORM }}/"
           DEST_TARGETS: "${{ env.WEBROOT }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
           DEST_PACKAGES: "${{ env.WEBROOT }}/snapshots/packages/${{ env.PLATFORM }}/"
           REMOTE_PRIVATEKEY: "${{secrets.HOSTHATCH_PRIVATEKEY}}"
@@ -400,8 +402,8 @@ jobs:
       - name: Deploy Files To PacificRack Node
         env:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.PACIFICRACK_IP }}"
-          SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
-          SOURCE_PACKAGES: "openwrt/bin/packages/${{ env.PLATFORM }}/"
+          SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          SOURCE_PACKAGES: "${{ env.OPENWRT_ROOT_PATH }}/bin/packages/${{ env.PLATFORM }}/"
           DEST_TARGETS: "${{ env.WEBROOT }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
           DEST_PACKAGES: "${{ env.WEBROOT }}/snapshots/packages/${{ env.PLATFORM }}/"
           REMOTE_PRIVATEKEY: "${{secrets.PACIFICRACK_PRIVATEKEY}}"
@@ -436,7 +438,7 @@ jobs:
 
       - name: Deploy Files To Onedrive
         env:
-          SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}"
+          SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}"
           DEST_TARGETS: "snapshots/targets/${{ env.TARGET }}"
           ONEDRIVEUPLOADER_CONF: "${{ secrets.ONEDRIVEUPLOADER_CONF }}"
         if: env.ONEDRIVEUPLOADER_CONF != null

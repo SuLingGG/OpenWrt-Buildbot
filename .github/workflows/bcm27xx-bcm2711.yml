@@ -6,27 +6,28 @@
 # Blog: https://p3terx.com
 #=================================================
 
-name: Build Raspberry Pi 2 OpenWrt
+name: Build Raspberry Pi 4 OpenWrt
 
 on:
   repository_dispatch:
+    types: [project, rpi4]
   workflow_dispatch:
   schedule:
-    - cron: 0 20 * * 1,3,5
+    - cron: 0 20 * * 0,2,4,6
 #  watch:
 #    types: started
 
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: openwrt-18.06-k5.4
-  CONFIG_FILE: config/bcm27xx/rpi2-openwrt-target.config
+  CONFIG_FILE: config/bcm27xx/bcm2711.config
   DIY_SH: scripts/project-openwrt.sh
   WEBROOT: /data/dnmp/www/openwrt.cc
-  RUNNER: project-rpi2
+  RUNNER: project-rpi4
 
 jobs:
   Toolchain:
-    runs-on: project-rpi2
+    runs-on: project-rpi4
 
     outputs:
       TOOLCHAIN_STATUS: ${{ steps.toolchain.outputs.TOOLCHAIN_STATUS }}
@@ -91,10 +92,14 @@ jobs:
         run: |
           [ -e files ] && mv files $OPENWRTROOT/files
           cd $OPENWRTROOT
+          echo -e "CONFIG_USB_LAN78XX=y\nCONFIG_USB_NET_DRIVERS=y" >> target/linux/bcm27xx/bcm2711/config-5.4
+          mkdir -p files/lib/firmware/brcm/
+          wget -q https://raw.githubusercontent.com/openwrt/cypress-nvram/master/brcmfmac43455-sdio.raspberrypi%2C4-model-b.txt -O files/lib/firmware/brcm/brcmfmac43455-sdio.raspberrypi,4-compute-module.txt
           chmod +x ../scripts/*.sh
           ../$DIY_SH
-          ../scripts/preset-clash-core.sh armv7
+          ../scripts/preset-clash-core.sh armv8
           ../scripts/preset-terminal-tools.sh
+          sed -i 's/VHT80/VHT20/g' package/kernel/mac80211/files/lib/wifi/mac80211.sh
 
       - name: Download All Packages
         id: download
@@ -157,7 +162,7 @@ jobs:
   Firmware:
     if: needs.Toolchain.outputs.TOOLCHAIN_STATUS == 'success'
     needs: [Toolchain]
-    runs-on: project-rpi2
+    runs-on: project-rpi4
 
     outputs:
       PLATFORM: ${{ steps.compile.outputs.PLATFORM }}
@@ -259,7 +264,7 @@ jobs:
   Extra-Packages:
     if: needs.Firmware.outputs.GENERATE_STATUS == 'success'
     needs: [Firmware]
-    runs-on: project-rpi2
+    runs-on: project-rpi4
 
     outputs:
       COMPILE_STATUS: ${{ steps.compile.outputs.COMPILE_STATUS }}

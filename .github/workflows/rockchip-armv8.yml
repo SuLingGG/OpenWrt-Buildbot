@@ -19,7 +19,7 @@ on:
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: openwrt-18.06-k5.4
-  CONFIG_FILE: config/rockchip/rockchip-openwrt-target.config
+  CONFIG_FILE: config/rockchip/armv8.config
   DIY_SH: scripts/project-openwrt.sh
   WEBROOT: /data/dnmp/www/openwrt.cc
   RUNNER: project-r2s

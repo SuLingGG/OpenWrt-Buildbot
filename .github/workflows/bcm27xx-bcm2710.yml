@@ -6,27 +6,27 @@
 # Blog: https://p3terx.com
 #=================================================
 
-name: Build Sunxi Cortex-a53 OpenWrt
+name: Build Raspberry Pi 3 OpenWrt
 
 on:
   repository_dispatch:
   workflow_dispatch:
   schedule:
-    - cron: 0 16 * * 2,4,6
+    - cron: 0 10 * * 2,4,6
 #  watch:
 #    types: started
 
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: openwrt-18.06-k5.4
-  CONFIG_FILE: config/sunxi/build-sunxi-cortexa53-target.config
+  CONFIG_FILE: config/bcm27xx/bcm2710.config
   DIY_SH: scripts/project-openwrt.sh
   WEBROOT: /data/dnmp/www/openwrt.cc
-  RUNNER: project-sunxi-a53
+  RUNNER: project-rpi3
 
 jobs:
   Toolchain:
-    runs-on: project-sunxi-a53
+    runs-on: project-rpi3
 
     outputs:
       TOOLCHAIN_STATUS: ${{ steps.toolchain.outputs.TOOLCHAIN_STATUS }}
@@ -54,7 +54,7 @@ jobs:
           sudo umount /dev/loop*p1 || true
           sudo losetup -D || true
           rm -rf openwrt.img
-          fallocate -l 100G openwrt.img
+          fallocate -l 150G openwrt.img
           echo 'type=83' | sfdisk openwrt.img
           export LOOP="$(sudo losetup -f -P --show openwrt.img)"
           echo "LOOP=$LOOP" >> $GITHUB_ENV
@@ -88,11 +88,8 @@ jobs:
           ./scripts/feeds install -a
 
       - name: Load Custom Configuration
-        id: load
         run: |
           [ -e files ] && mv files $OPENWRTROOT/files
-          cp $CONFIG_FILE $OPENWRTROOT/.config
-          cat config/firmware-extra.config >> $OPENWRTROOT/.config
           cd $OPENWRTROOT
           chmod +x ../scripts/*.sh
           ../$DIY_SH
@@ -106,6 +103,7 @@ jobs:
           wget -q https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
           rm -rf dl
           cp -r /data/cache/dl .
+          echo "CONFIG_ALL=y" >> .config
           make defconfig
           make download -j16 IGNORE_ERRORS=1
           find dl -size -1024c -exec ls -l {} \;
@@ -114,7 +112,12 @@ jobs:
       - name: Compile Tools
         id: tools
         run: |
+          rm -f $OPENWRTROOT/.config*
+          cp $CONFIG_FILE $OPENWRTROOT/.config
+          cat config/firmware-extra.config >> $OPENWRTROOT/.config
+          cat config/base-wireless-support.config >> $OPENWRTROOT/.config
           cd $OPENWRTROOT
+          make defconfig
           echo -e "$(nproc) threads compile"
           make tools/install -j$(nproc) BUILD_LOG=1 || make tools/install -j1 V=s
 
@@ -154,7 +157,8 @@ jobs:
   Firmware:
     if: needs.Toolchain.outputs.TOOLCHAIN_STATUS == 'success'
     needs: [Toolchain]
-    runs-on: project-sunxi-a53
+    runs-on: project-rpi3
+
     outputs:
       PLATFORM: ${{ steps.compile.outputs.PLATFORM }}
       TARGET: ${{ steps.compile.outputs.TARGET }}
@@ -216,6 +220,7 @@ jobs:
           cp ../data/opkg/distfeeds.conf files/etc/opkg/distfeeds.conf
           mkdir -p files/www/snapshots
           cp -r bin/targets files/www/snapshots
+          echo "dtparam=i2c_arm=on,audio=on" >> target/linux/bcm27xx/image/config.txt
           mkdir -p files/etc/uci-defaults/
           cp ../scripts/init-settings.sh files/etc/uci-defaults/99-init-settings
           mkdir -p files/bin
@@ -223,9 +228,9 @@ jobs:
           make package/install || make package/install -j1 V=s
           make target/install || make target/install -j1 V=s
           make checksum
+          mkdir -p $OPENWRTROOT/output/bin/targets/$TARGET
+          cp -r $FIRMWARE $OPENWRTROOT/output/bin/targets/$TARGET
           echo "::set-output name=GENERATE_STATUS::success"
-          mkdir -p $OPENWRTROOT/output
-          cp -r bin $OPENWRTROOT/output
 
       - name: Collect Logs
         id: firmware-logs-collect
@@ -233,23 +238,6 @@ jobs:
         run: |
           cd $OPENWRTROOT
           mv logs output/logs/${{ github.job }}
-          [ -e output/bin/targets/$TARGET/$SUBTARGET ] && cp -r output/logs output/bin/targets/$TARGET/$SUBTARGET
-
-      - name: Compress Bin Folder
-        if: steps.generate.outputs.GENERATE_STATUS == 'success'
-        id: compress
-        run: |
-          cd $OPENWRTROOT/output
-          zip -q -s 500m -r bin-archive.zip bin
-          rm -rf bin
-
-      - name: Upload Bin Archive
-        uses: actions/upload-artifact@main
-        if: steps.generate.outputs.GENERATE_STATUS == 'success'
-        id: upload
-        with:
-          name: Bin-Archive
-          path: openwrt/output
 
       - name: Upload Logs
         id: firmware-logs-upload
@@ -268,9 +256,99 @@ jobs:
           sudo losetup -d $LOOP || true
           lsblk
 
-  Upload:
+  Extra-Packages:
     if: needs.Firmware.outputs.GENERATE_STATUS == 'success'
     needs: [Firmware]
+    runs-on: project-rpi3
+
+    outputs:
+      COMPILE_STATUS: ${{ steps.compile.outputs.COMPILE_STATUS }}
+
+    steps:
+      - name: Restore Variables
+        id: restore
+        run: |
+          echo "PLATFORM=$(echo '${{needs.Firmware.outputs.PLATFORM}}')" >> $GITHUB_ENV
+          echo "TARGET=$(echo '${{needs.Firmware.outputs.TARGET}}')" >> $GITHUB_ENV
+          echo "SUBTARGET=$(echo '${{needs.Firmware.outputs.SUBTARGET}}')" >> $GITHUB_ENV
+
+      - name: Initialization Environment
+        id: init
+        run: |
+          export LOOP="$(sudo losetup -f -P --show openwrt.img)"
+          echo "LOOP=$LOOP" >> $GITHUB_ENV
+          echo "::set-output name=LOOP::$(echo $LOOP)"
+          mkdir -p openwrt
+          sudo mount ${LOOP}p1 openwrt
+          lsblk
+          sudo chown -R suling:suling openwrt
+          cd openwrt
+          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
+
+      - name: Compile Extra Packages
+        id: compile
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        timeout-minutes: 330
+        run: |
+          cd $OPENWRTROOT
+          rm -f .config*
+          cp ../$CONFIG_FILE ./.config
+          cat ../config/packages-extra.config >> $OPENWRTROOT/.config
+          make defconfig
+          make diffconfig
+          make target/clean
+          make package/libs/mbedtls/clean
+          make target/compile -j$(nproc) 'IGNORE_ERRORS=n m' BUILD_LOG=1 || make target/compile -j1 V=s IGNORE_ERRORS=1
+          make package/compile -j$(nproc) BUILD_LOG=1 IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
+          make package/index
+          mkdir -p $OPENWRTROOT/output/bin/packages
+          cp -r bin/packages/$PLATFORM $OPENWRTROOT/output/bin/packages
+          echo "::set-output name=COMPILE_STATUS::success"
+
+      - name: Collect Logs
+        id: packages-logs-collect
+        if: always()
+        run: |
+          cd $OPENWRTROOT
+          mv logs output/logs/${{ github.job }}
+          [ -e output/bin/targets/$TARGET/$SUBTARGET ] && cp -r output/logs output/bin/targets/$TARGET/$SUBTARGET
+
+      - name: Compress Bin Folder
+        if: steps.compile.outputs.COMPILE_STATUS == 'success'
+        id: compress
+        run: |
+          cd $OPENWRTROOT/output
+          zip -q -s 500m -r bin-archive.zip bin
+          rm -rf bin
+
+      - name: Upload Bin Archive
+        id: upload
+        uses: actions/upload-artifact@main
+        with:
+          name: Bin-Archive
+          path: openwrt/output
+
+      - name: Upload Logs
+        id: packages-logs-upload
+        if: always()
+        uses: actions/upload-artifact@main
+        with:
+          name: Logs-${{ github.job }}
+          path: openwrt/output/logs/${{ github.job }}
+
+      - name: Umount Disk Image
+        if: always()
+        id: prepare
+        run: |
+          sync
+          sudo umount ${LOOP}p1 || true
+          sudo losetup -d $LOOP || true
+          lsblk
+
+  Upload:
+    if: needs.Extra-Packages.outputs.COMPILE_STATUS == 'success'
+    needs: [Extra-Packages, Firmware]
     runs-on: ubuntu-18.04
 
     steps:
@@ -302,7 +380,9 @@ jobs:
         env:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
           SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          SOURCE_PACKAGES: "openwrt/bin/packages/${{ env.PLATFORM }}/"
           DEST_TARGETS: "${{ env.WEBROOT }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          DEST_PACKAGES: "${{ env.WEBROOT }}/snapshots/packages/${{ env.PLATFORM }}/"
           REMOTE_PRIVATEKEY: "${{secrets.HOSTHATCH_PRIVATEKEY}}"
         if: env.REMOTE_PRIVATEKEY != null
         run: |
@@ -311,15 +391,19 @@ jobs:
           echo "${{secrets.HOSTHATCH_PRIVATEKEY}}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET'"
+          bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET \
+          $WEBROOT/snapshots/packages/$PLATFORM'"
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
+          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
 
       - name: Deploy Files To PacificRack Node
         id: pacificrack
         env:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.PACIFICRACK_IP }}"
           SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          SOURCE_PACKAGES: "openwrt/bin/packages/${{ env.PLATFORM }}/"
           DEST_TARGETS: "${{ env.WEBROOT }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          DEST_PACKAGES: "${{ env.WEBROOT }}/snapshots/packages/${{ env.PLATFORM }}/"
           REMOTE_PRIVATEKEY: "${{secrets.PACIFICRACK_PRIVATEKEY}}"
         if: env.REMOTE_PRIVATEKEY != null
         run: |
@@ -328,8 +412,10 @@ jobs:
           echo "${{secrets.PACIFICRACK_PRIVATEKEY}}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET'"
+          bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET \
+          $WEBROOT/snapshots/packages/$PLATFORM'"
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
+          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
 
       - name: Deploy Files To Onedrive
         id: onedrive

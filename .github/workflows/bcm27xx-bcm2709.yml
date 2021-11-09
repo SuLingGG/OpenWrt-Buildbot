@@ -6,27 +6,27 @@
 # Blog: https://p3terx.com
 #=================================================
 
-name: Build x86_64 OpenWrt
+name: Build Raspberry Pi 2 OpenWrt
 
 on:
   repository_dispatch:
   workflow_dispatch:
   schedule:
-    - cron: 0 8 * * 0,1,3,5
+    - cron: 0 20 * * 1,3,5
 #  watch:
 #    types: started
 
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: openwrt-18.06-k5.4
-  CONFIG_FILE: config/x86/x86_64-openwrt-target.config
+  CONFIG_FILE: config/bcm27xx/bcm2709.config
   DIY_SH: scripts/project-openwrt.sh
   WEBROOT: /data/dnmp/www/openwrt.cc
-  RUNNER: project-x86_64
+  RUNNER: project-rpi2
 
 jobs:
   Toolchain:
-    runs-on: project-x86_64
+    runs-on: project-rpi2
 
     outputs:
       TOOLCHAIN_STATUS: ${{ steps.toolchain.outputs.TOOLCHAIN_STATUS }}
@@ -93,7 +93,7 @@ jobs:
           cd $OPENWRTROOT
           chmod +x ../scripts/*.sh
           ../$DIY_SH
-          ../scripts/preset-clash-core.sh amd64
+          ../scripts/preset-clash-core.sh armv7
           ../scripts/preset-terminal-tools.sh
 
       - name: Download All Packages
@@ -157,7 +157,7 @@ jobs:
   Firmware:
     if: needs.Toolchain.outputs.TOOLCHAIN_STATUS == 'success'
     needs: [Toolchain]
-    runs-on: project-x86_64
+    runs-on: project-rpi2
 
     outputs:
       PLATFORM: ${{ steps.compile.outputs.PLATFORM }}
@@ -220,6 +220,7 @@ jobs:
           cp ../data/opkg/distfeeds.conf files/etc/opkg/distfeeds.conf
           mkdir -p files/www/snapshots
           cp -r bin/targets files/www/snapshots
+          echo "dtparam=i2c_arm=on,audio=on" >> target/linux/bcm27xx/image/config.txt
           mkdir -p files/etc/uci-defaults/
           cp ../scripts/init-settings.sh files/etc/uci-defaults/99-init-settings
           mkdir -p files/bin
@@ -258,7 +259,7 @@ jobs:
   Extra-Packages:
     if: needs.Firmware.outputs.GENERATE_STATUS == 'success'
     needs: [Firmware]
-    runs-on: project-x86_64
+    runs-on: project-rpi2
 
     outputs:
       COMPILE_STATUS: ${{ steps.compile.outputs.COMPILE_STATUS }}

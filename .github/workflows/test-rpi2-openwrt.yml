@@ -133,28 +133,28 @@ jobs:
         run: |
           cd $OPENWRT_ROOT_PATH
           echo -e "$(nproc) thread compile"
-          make tools/compile -j$(nproc) || make tools/compile -j1 V=s
+          make tools/compile -j$(nproc) BUILD_LOG=1 || make tools/compile -j1 V=s
 
       - name: Compile Toolchain
         if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
         run: |
           cd $OPENWRT_ROOT_PATH
           echo -e "$(nproc) thread compile"
-          make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
+          make toolchain/compile -j$(nproc) BUILD_LOG=1 || make toolchain/compile -j1 V=s
           rm -rf .config* bin dl
 
-      - name: Collect Logs
-        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
-        run: |
-          mkdir -p output/logs
-          mv $OPENWRT_ROOT_PATH/logs output/logs/${{ github.job }} || true
-
-      - name: Upload Logs
-        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+      - name: Upload Job Logs
+        if: always()
         uses: actions/upload-artifact@main
         with:
           name: Logs-${{ github.job }}
-          path: output/logs/${{ github.job }}
+          path: $OPENWRT_ROOT_PATH/logs
+
+      - name: Collect Workflows Logs
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        run: |
+          mkdir -p output/logs
+          mv $OPENWRT_ROOT_PATH/logs output/logs/${{ github.job }}
 
       - name: Generate Toolchain Image
         if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
@@ -190,8 +190,8 @@ jobs:
 
       - name: Initialization Environment
         run: |
-          rm -rf $OPENWRT_ROOT_PATH/* $OPENWRT_ROOT_PATH/.git
-          mkdir -p openwrt-ro openwrt workdir overlay
+          ls -A $OPENWRT_ROOT_PATH | xargs -I {} rm -rf $OPENWRT_ROOT_PATH/{}
+          mkdir -p openwrt-ro workdir overlay
           sudo mount -o loop /data/toolchain/$TOOLCHAIN_IMAGE.img openwrt-ro
           sudo mount -t overlay overlay -o lowerdir=openwrt-ro,upperdir=overlay,workdir=workdir openwrt
           sudo chown suling:suling $OPENWRT_ROOT_PATH
@@ -256,20 +256,19 @@ jobs:
           make json_overview_image_info
           make checksum
           mkdir -p ../output/bin/targets/$TARGET
-          cp -r bin/targets/$TARGET/$SUBTARGET ../output/bin/targets/$TARGET
+          mv bin/targets/$TARGET/$SUBTARGET ../output/bin/targets/$TARGET
 
-      - name: Collect Logs
-        if: always()
-        run: |
-          mkdir -p output/logs
-          mv $OPENWRT_ROOT_PATH/logs output/logs/${{ github.job }} || true
-
-      - name: Upload Logs
+      - name: Upload Job Logs
         if: always()
         uses: actions/upload-artifact@main
         with:
           name: Logs-${{ github.job }}
-          path: output/logs/${{ github.job }}
+          path: $OPENWRT_ROOT_PATH/logs
+
+      - name: Collect Workflows Logs
+        run: |
+          mkdir -p output/logs
+          mv $OPENWRT_ROOT_PATH/logs output/logs/${{ github.job }}
 
       - name: Clean Process
         if: failure()
@@ -312,31 +311,30 @@ jobs:
           make package/compile -j$(nproc) BUILD_LOG=1 IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
           make package/index
           mkdir -p ../output/bin/packages
-          cp -r bin/packages/$PLATFORM ../output/bin/packages
+          mv bin/packages/$PLATFORM ../output/bin/packages
 
-      - name: Collect Logs
-        if: always()
-        run: |
-          mv $OPENWRT_ROOT_PATH/logs output/logs/${{ github.job }} || true
-          mv output/logs output/bin/targets/$TARGET/$SUBTARGET || true
-
-      - name: Compress Bin Folder
-        run: |
-          cd output
-          zip -q -s 1900m -r bin-archive.zip bin
-
-      - name: Upload Bin Archive
-        uses: actions/upload-artifact@main
-        with:
-          name: Bin-Archive
-          path: output
-
-      - name: Upload Logs
+      - name: Upload Job Logs
         if: always()
         uses: actions/upload-artifact@main
         with:
           name: Logs-${{ github.job }}
-          path: output/logs/${{ github.job }}
+          path: $OPENWRT_ROOT_PATH/logs
+
+      - name: Collect Workflows Logs
+        run: |
+          mkdir -p output/logs
+          mv $OPENWRT_ROOT_PATH/logs output/logs/${{ github.job }}
+          mv output/logs output/bin/targets/$TARGET/$SUBTARGET
+
+      - name: Compress Output Folder
+        run: |
+          zip -s 1900m -qrm output/output-archive.zip output/bin
+
+      - name: Upload Output Archive
+        uses: actions/upload-artifact@main
+        with:
+          name: Output-Archive
+          path: output
 
       - name: Clean Process
         if: always()
@@ -363,18 +361,17 @@ jobs:
           echo "SUBTARGET=$(echo '${{needs.Toolchain.outputs.SUBTARGET}}')" >> $GITHUB_ENV
           echo "TOOLCHAIN_IMAGE=$(echo '${{needs.Toolchain.outputs.TOOLCHAIN_IMAGE}}')" >> $GITHUB_ENV
 
-      - name: Download Bin Archive
+      - name: Download Output Archive
         uses: actions/download-artifact@v2
         with:
-          name: Bin-Archive
+          name: Output-Archive
           path: openwrt
 
       - name: Decompress Bin Folder
         run: |
           cd openwrt
           echo "OPENWRT_ROOT_PATH=$PWD" >> $GITHUB_ENV
-          echo "::set-output name=OPENWRT_ROOT_PATH::$(echo $PWD)"
-          zip -q -s 0 bin-archive.zip --out $TARGET-$SUBTARGET.zip
+          zip -qs 0 output-archive.zip --out $TARGET-$SUBTARGET.zip
           unzip $TARGET-$SUBTARGET.zip
 
       - name: Deploy Files To HostHatch Node

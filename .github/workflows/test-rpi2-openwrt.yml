@@ -148,7 +148,7 @@ jobs:
         uses: actions/upload-artifact@main
         with:
           name: Logs-${{ github.job }}
-          path: $OPENWRT_ROOT_PATH/logs
+          path: ${{ env.OPENWRT_ROOT_PATH }}/logs
           if-no-files-found: ignore
 
       - name: Collect Workflows Logs
@@ -264,7 +264,7 @@ jobs:
         uses: actions/upload-artifact@main
         with:
           name: Logs-${{ github.job }}
-          path: $OPENWRT_ROOT_PATH/logs
+          path: ${{ env.OPENWRT_ROOT_PATH }}/logs
           if-no-files-found: ignore
 
       - name: Collect Workflows Logs
@@ -321,7 +321,7 @@ jobs:
         uses: actions/upload-artifact@main
         with:
           name: Logs-${{ github.job }}
-          path: $OPENWRT_ROOT_PATH/logs
+          path: ${{ env.OPENWRT_ROOT_PATH }}/logs
           if-no-files-found: ignore
 
       - name: Collect Workflows Logs

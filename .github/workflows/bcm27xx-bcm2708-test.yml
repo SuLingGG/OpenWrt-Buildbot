@@ -31,7 +31,7 @@ jobs:
     runs-on: project-rpi1
 
     outputs:
-      OPENWRT_ROOT_PATH: ${{ steps.init.outputs.OPENWRT_ROOT_PATH }}
+      OPENWRT_ROOT_PATH: ${{ steps.clone.outputs.OPENWRT_ROOT_PATH }}
       CURRENT_BRANCH: ${{ steps.env.outputs.CURRENT_BRANCH }}
       SOURCE_OWNER: ${{ steps.env.outputs.SOURCE_OWNER }}
       SOURCE_REPO: ${{ steps.env.outputs.SOURCE_REPO }}
@@ -45,7 +45,6 @@ jobs:
         uses: actions/checkout@main
 
       - name: Initialization Environment
-        id: init
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
@@ -65,6 +64,7 @@ jobs:
           sudo chown suling:suling workspace
 
       - name: Clone Source Code
+        id: clone
         run: |
           df -hT $PWD
           git clone $SOURCE_URL -b $SOURCE_BRANCH workspace/openwrt

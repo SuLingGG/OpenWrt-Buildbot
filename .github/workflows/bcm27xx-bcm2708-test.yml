@@ -52,13 +52,14 @@ jobs:
           sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804)
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
-          fallocate -l 50G openwrt.img
-          echo 'type=83' | sfdisk openwrt.img
-          export WORKSPACE_LOOP_DEVNAME="$(sudo losetup -f -P --show openwrt.img)"
+          mkdir -p workspace
+          fallocate -l 50G workspace.img
+          echo 'type=83' | sfdisk workspace.img
+          export WORKSPACE_LOOP_DEVNAME="$(sudo losetup -f -P --show workspace.img)"
           echo "WORKSPACE_LOOP_DEVNAME=$WORKSPACE_LOOP_DEVNAME" >> $GITHUB_ENV
           sudo mkfs.btrfs ${WORKSPACE_LOOP_DEVNAME}p1
-          sudo mount -o nossd,compress=zstd ${WORKSPACE_LOOP_DEVNAME}p1 $GITHUB_WORKSPACE
-          sudo chown suling:suling $GITHUB_WORKSPACE
+          sudo mount -o nossd,compress=zstd ${WORKSPACE_LOOP_DEVNAME}p1 workspace
+          sudo chown suling:suling workspace
 
       - name: Checkout
         uses: actions/checkout@main
@@ -66,8 +67,8 @@ jobs:
       - name: Clone Source Code
         run: |
           df -hT $PWD
-          git clone $SOURCE_URL -b $SOURCE_BRANCH openwrt
-          cd openwrt
+          git clone $SOURCE_URL -b $SOURCE_BRANCH workspace/openwrt
+          cd workspace/openwrt
           echo "OPENWRT_ROOT_PATH=$PWD" >> $GITHUB_ENV
           echo "::set-output name=OPENWRT_ROOT_PATH::$(echo $PWD)"
 
@@ -160,6 +161,7 @@ jobs:
         if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
         run: |
           mkdir -p /data/toolchain
+          cd workspace
           mksquashfs openwrt /data/toolchain/$TOOLCHAIN_IMAGE.img -force-gid 1000 -force-uid 1000 -comp lz4
           echo $CURRENT_HASH > /data/toolchain/$TOOLCHAIN_IMAGE.hash
 
@@ -169,7 +171,6 @@ jobs:
           sync
           sudo umount ${WORKSPACE_LOOP_DEVNAME}p1 || true
           sudo losetup -d $WORKSPACE_LOOP_DEVNAME || true
-          rm -f openwrt.img || true
           ls -A | xargs -I {} sudo rm -rf {} || true
 
   Firmware:
@@ -194,14 +195,15 @@ jobs:
       - name: Initialization Environment
         id: init
         run: |
-          fallocate -l 150G openwrt.img
-          echo 'type=83' | sfdisk openwrt.img
-          export WORKSPACE_LOOP_DEVNAME="$(sudo losetup -f -P --show openwrt.img)"
+          mkdir -p workspace
+          fallocate -l 150G workspace.img
+          echo 'type=83' | sfdisk workspace.img
+          export WORKSPACE_LOOP_DEVNAME="$(sudo losetup -f -P --show workspace.img)"
           echo "WORKSPACE_LOOP_DEVNAME=$WORKSPACE_LOOP_DEVNAME" >> $GITHUB_ENV
           echo "::set-output name=WORKSPACE_LOOP_DEVNAME::$(echo $WORKSPACE_LOOP_DEVNAME)"
           sudo mkfs.btrfs ${WORKSPACE_LOOP_DEVNAME}p1
-          sudo mount -o nossd,compress=zstd ${WORKSPACE_LOOP_DEVNAME}p1 $GITHUB_WORKSPACE
-          sudo chown suling:suling $GITHUB_WORKSPACE
+          sudo mount -o nossd,compress=zstd ${WORKSPACE_LOOP_DEVNAME}p1 workspace
+          sudo chown suling:suling workspace
 
       - name: Checkout
         uses: actions/checkout@main
@@ -286,8 +288,8 @@ jobs:
           make json_overview_image_info
           make checksum
           cp key-build.pub bin/targets/$TARGET/$SUBTARGET
-          mkdir -p ../output/bin/targets/$TARGET
-          mv bin/targets/$TARGET/$SUBTARGET ../output/bin/targets/$TARGET
+          mkdir -p $GITHUB_WORKSPACE/output/bin/targets/$TARGET
+          mv bin/targets/$TARGET/$SUBTARGET $GITHUB_WORKSPACE/output/bin/targets/$TARGET
 
       - name: Upload Job Logs
         if: always()
@@ -307,7 +309,7 @@ jobs:
         run: |
           sync
           sudo umount $OPENWRT_ROOT_PATH || true
-          sudo umount $GITHUB_WORKSPACE/openwrt-ro || true
+          sudo umount workspace/openwrt-ro || true
           sudo umount ${WORKSPACE_LOOP_DEVNAME}p1 || true
           sudo losetup -d $WORKSPACE_LOOP_DEVNAME || true
           ls -A | xargs -I {} rm -rf {} || true
@@ -344,8 +346,8 @@ jobs:
           make target/compile -j$(nproc) IGNORE_ERRORS="m n" BUILD_LOG=1 || make target/compile -j1 V=s IGNORE_ERRORS="m n"
           make package/compile -j$(nproc) BUILD_LOG=1 IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
           make package/index
-          mkdir -p ../output/bin/packages
-          mv bin/packages/$PLATFORM ../output/bin/packages
+          mkdir -p $GITHUB_WORKSPACE/output/bin/packages
+          mv bin/packages/$PLATFORM $GITHUB_WORKSPACE/output/bin/packages
 
       - name: Upload Job Logs
         if: always()
@@ -377,7 +379,7 @@ jobs:
         run: |
           sync
           sudo umount $OPENWRT_ROOT_PATH || true
-          sudo umount $GITHUB_WORKSPACE/openwrt-ro || true
+          sudo umount workspace/openwrt-ro || true
           sudo umount ${WORKSPACE_LOOP_DEVNAME}p1 || true
           sudo losetup -d $WORKSPACE_LOOP_DEVNAME || true
           ls -A | xargs -I {} rm -rf {} || true

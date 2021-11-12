@@ -6,21 +6,21 @@
 # Blog: https://p3terx.com
 #=================================================
 
-name: Test Raspberry Pi 2 OpenWrt
+name: Test Raspberry Pi 1 OpenWrt
 
 on:
   workflow_dispatch:
   # schedule:
-  #   - cron: 0 20 * * 1,3,5
+  #   - cron: 0 6 * * 2,4,6
   # watch:
   #   types: started
 
 env:
-  CONFIG_FILE: config/bcm27xx/bcm2709.config
+  CONFIG_FILE: config/bcm27xx/bcm2708.config
   SOURCE_URL: https://github.com/immortalwrt/immortalwrt
   SOURCE_BRANCH: openwrt-18.06-k5.4
   DIY_SH: scripts/immortalwrt.sh
-  WEBROOT: /data/dnmp/www/openwrt.cc
+  WEB_ROOT_PATH: /data/dnmp/www/openwrt.cc
   TOOLCHAIN_TAG: toolchain
   TOOLCHAIN_RELEASE_UPLOAD: true
   FIRMWARE_RELEASE_UPLOAD: true
@@ -28,7 +28,7 @@ env:
 
 jobs:
   Toolchain:
-    runs-on: project-rpi2
+    runs-on: project-rpi1
 
     outputs:
       OPENWRT_LOOP_DEVNAME: ${{ steps.init.outputs.OPENWRT_LOOP_DEVNAME }}
@@ -174,7 +174,7 @@ jobs:
 
   Firmware:
     needs: [Toolchain]
-    runs-on: project-rpi2
+    runs-on: project-rpi1
 
     steps:
       - name: Restore Variables
@@ -198,6 +198,19 @@ jobs:
           sudo chown suling:suling $OPENWRT_ROOT_PATH
           cd $OPENWRT_ROOT_PATH
           git pull
+
+      - name: Import Build Keys
+        env:
+          BUILD_PRIVATEKEY: ${{ secrets.BUILD_PRIVATEKEY }}
+          BUILD_PUBLICKEY: ${{ secrets.BUILD_PUBLICKEY }}
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          echo -e "$BUILD_PRIVATEKEY" > key-build
+          echo -e "$BUILD_PUBLICKEY" > key-build.pub
+          wc -c key-build key-build.pub
+          export PUBLICKEY_FINGERPRINT=$(staging_dir/host/bin/usign -F -p key-build.pub)
+          mkdir -p files/etc/opkg/keys
+          cp key-build.pub files/etc/opkg/keys/$PUBLICKEY_FINGERPRINT
 
       - name: Load Custom Configuration
         run: |
@@ -256,6 +269,7 @@ jobs:
           make target/install -j$(nproc) BUILD_LOG=1 || make target/install -j1 V=s
           make json_overview_image_info
           make checksum
+          cp key-build.pub bin/targets/$TARGET/$SUBTARGET
           mkdir -p ../output/bin/targets/$TARGET
           mv bin/targets/$TARGET/$SUBTARGET ../output/bin/targets/$TARGET
 
@@ -284,7 +298,7 @@ jobs:
 
   Extra-Packages:
     needs: [Toolchain, Firmware]
-    runs-on: project-rpi2
+    runs-on: project-rpi1
 
     steps:
       - name: Restore Variables
@@ -330,14 +344,15 @@ jobs:
           mv $OPENWRT_ROOT_PATH/logs output/logs/${{ github.job }}
           mv output/logs output/bin/targets/$TARGET/$SUBTARGET
 
-      - name: Compress Output Folder
+      - name: Compress Bin Folder
         run: |
-          zip -s 1900m -qrm output/output-archive.zip output/bin
+          cd output
+          zip -s 1900m -qrm bin-archive.zip bin
 
-      - name: Upload Output Archive
+      - name: Upload Bin Archive
         uses: actions/upload-artifact@main
         with:
-          name: Output-Archive
+          name: Bin-Archive
           path: output
 
       - name: Clean Process
@@ -366,17 +381,17 @@ jobs:
           echo "SUBTARGET=$(echo '${{needs.Toolchain.outputs.SUBTARGET}}')" >> $GITHUB_ENV
           echo "TOOLCHAIN_IMAGE=$(echo '${{needs.Toolchain.outputs.TOOLCHAIN_IMAGE}}')" >> $GITHUB_ENV
 
-      - name: Download Output Archive
+      - name: Download Bin Archive
         uses: actions/download-artifact@v2
         with:
-          name: Output-Archive
+          name: Bin-Archive
           path: openwrt
 
-      - name: Decompress Bin Folder
+      - name: Decompress Bin Archive
         run: |
           cd openwrt
           echo "OPENWRT_ROOT_PATH=$PWD" >> $GITHUB_ENV
-          zip -qs 0 output-archive.zip --out $TARGET-$SUBTARGET.zip
+          zip -qs 0 bin-archive.zip --out $TARGET-$SUBTARGET.zip
           unzip $TARGET-$SUBTARGET.zip
 
       - name: Deploy Files To HostHatch Node
@@ -384,18 +399,18 @@ jobs:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
           SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
           SOURCE_PACKAGES: "${{ env.OPENWRT_ROOT_PATH }}/bin/packages/${{ env.PLATFORM }}/"
-          DEST_TARGETS: "${{ env.WEBROOT }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
-          DEST_PACKAGES: "${{ env.WEBROOT }}/snapshots/packages/${{ env.PLATFORM }}/"
-          REMOTE_PRIVATEKEY: "${{secrets.HOSTHATCH_PRIVATEKEY}}"
+          DEST_TARGETS: "${{ env.WEB_ROOT_PATH }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          DEST_PACKAGES: "${{ env.WEB_ROOT_PATH }}/snapshots/packages/${{ env.PLATFORM }}/"
+          REMOTE_PRIVATEKEY: "${{ secrets.HOSTHATCH_PRIVATEKEY }}"
         if: env.REMOTE_PRIVATEKEY != null
         run: |
           mkdir -p ~/.ssh/
           install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{secrets.HOSTHATCH_PRIVATEKEY}}" > ~/.ssh/id_rsa
+          echo "${{ secrets.HOSTHATCH_PRIVATEKEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET \
-          $WEBROOT/snapshots/packages/$PLATFORM'"
+          bash -c "'mkdir -p $WEB_ROOT_PATH/snapshots/targets/$TARGET/$SUBTARGET \
+          $WEB_ROOT_PATH/snapshots/packages/$PLATFORM'"
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
 
@@ -404,18 +419,18 @@ jobs:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.PACIFICRACK_IP }}"
           SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
           SOURCE_PACKAGES: "${{ env.OPENWRT_ROOT_PATH }}/bin/packages/${{ env.PLATFORM }}/"
-          DEST_TARGETS: "${{ env.WEBROOT }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
-          DEST_PACKAGES: "${{ env.WEBROOT }}/snapshots/packages/${{ env.PLATFORM }}/"
-          REMOTE_PRIVATEKEY: "${{secrets.PACIFICRACK_PRIVATEKEY}}"
+          DEST_TARGETS: "${{ env.WEB_ROOT_PATH }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          DEST_PACKAGES: "${{ env.WEB_ROOT_PATH }}/snapshots/packages/${{ env.PLATFORM }}/"
+          REMOTE_PRIVATEKEY: "${{ secrets.PACIFICRACK_PRIVATEKEY }}"
         if: env.REMOTE_PRIVATEKEY != null
         run: |
           mkdir -p ~/.ssh/
           install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{secrets.PACIFICRACK_PRIVATEKEY}}" > ~/.ssh/id_rsa
+          echo "${{ secrets.PACIFICRACK_PRIVATEKEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET \
-          $WEBROOT/snapshots/packages/$PLATFORM'"
+          bash -c "'mkdir -p $WEB_ROOT_PATH/snapshots/targets/$TARGET/$SUBTARGET \
+          $WEB_ROOT_PATH/snapshots/packages/$PLATFORM'"
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
 

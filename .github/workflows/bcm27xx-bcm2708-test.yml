@@ -41,6 +41,9 @@ jobs:
       TOOLCHAIN_IMAGE: ${{ steps.env.outputs.TOOLCHAIN_IMAGE }}
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@main
+
       - name: Initialization Environment
         id: init
         env:
@@ -60,9 +63,6 @@ jobs:
           sudo mkfs.btrfs ${WORKSPACE_LOOP_DEVNAME}p1
           sudo mount -o nossd,compress=zstd ${WORKSPACE_LOOP_DEVNAME}p1 workspace
           sudo chown suling:suling workspace
-
-      - name: Checkout
-        uses: actions/checkout@main
 
       - name: Clone Source Code
         run: |
@@ -192,6 +192,9 @@ jobs:
           echo "SUBTARGET=$(echo '${{needs.Toolchain.outputs.SUBTARGET}}')" >> $GITHUB_ENV
           echo "TOOLCHAIN_IMAGE=$(echo '${{needs.Toolchain.outputs.TOOLCHAIN_IMAGE}}')" >> $GITHUB_ENV
 
+      - name: Checkout
+        uses: actions/checkout@main
+
       - name: Initialization Environment
         id: init
         run: |
@@ -204,9 +207,6 @@ jobs:
           sudo mkfs.btrfs ${WORKSPACE_LOOP_DEVNAME}p1
           sudo mount -o nossd,compress=zstd ${WORKSPACE_LOOP_DEVNAME}p1 workspace
           sudo chown suling:suling workspace
-
-      - name: Checkout
-        uses: actions/checkout@main
 
       - name: Prepare Toolchain Image
         run: |

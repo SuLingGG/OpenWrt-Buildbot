@@ -332,9 +332,26 @@ jobs:
           echo "SUBTARGET=$(echo '${{needs.Toolchain.outputs.SUBTARGET}}')" >> $GITHUB_ENV
           echo "TOOLCHAIN_IMAGE=$(echo '${{needs.Toolchain.outputs.TOOLCHAIN_IMAGE}}')" >> $GITHUB_ENV
 
-      - name: Compile Extra Packages
+      - name: Clean Build Cache
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          make target/clean
+          make package/libs/mbedtls/clean
+
+      - name: Import Build Keys
         env:
-          DEBIAN_FRONTEND: noninteractive
+          BUILD_PRIVATEKEY: ${{ secrets.BUILD_PRIVATEKEY }}
+          BUILD_PUBLICKEY: ${{ secrets.BUILD_PUBLICKEY }}
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          echo -e "$BUILD_PRIVATEKEY" > key-build
+          echo -e "$BUILD_PUBLICKEY" > key-build.pub
+          wc -c key-build key-build.pub
+          export PUBLICKEY_FINGERPRINT=$(usign -F -p key-build.pub)
+          mkdir -p files/etc/opkg/keys
+          cp key-build.pub files/etc/opkg/keys/$PUBLICKEY_FINGERPRINT
+
+      - name: Compile Extra Packages
         run: |
           cd $OPENWRT_ROOT_PATH
           rm -f .config
@@ -342,8 +359,6 @@ jobs:
           cat $GITHUB_WORKSPACE/config/packages-extra.config >> $OPENWRT_ROOT_PATH/.config
           sed -i '/CONFIG_ALL/d' $OPENWRT_ROOT_PATH/.config
           make defconfig
-          make target/clean
-          make package/libs/mbedtls/clean
           make target/compile -j$(nproc) IGNORE_ERRORS="m n" BUILD_LOG=1 || make target/compile -j1 V=s IGNORE_ERRORS="m n"
           make package/compile -j$(nproc) BUILD_LOG=1 IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
           make package/index

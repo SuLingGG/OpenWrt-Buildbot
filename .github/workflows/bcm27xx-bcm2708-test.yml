@@ -236,11 +236,11 @@ jobs:
           [ -e files ] && mv files $OPENWRT_ROOT_PATH/files
           [ -e $CONFIG_FILE ] && cp $CONFIG_FILE $OPENWRT_ROOT_PATH/.config
           cat config/firmware-extra.config >> $OPENWRT_ROOT_PATH/.config
-          chmod +x scripts/*.sh
+          chmod +x $GITHUB_WORKSPACE/scripts/*.sh
           cd $OPENWRT_ROOT_PATH
-          ../$DIY_SH
-          ../scripts/preset-clash-core.sh armv8
-          ../scripts/preset-terminal-tools.sh
+          $GITHUB_WORKSPACE/scripts/$DIY_SH
+          $GITHUB_WORKSPACE/scripts/preset-clash-core.sh armv8
+          $GITHUB_WORKSPACE/scripts/preset-terminal-tools.sh
           make defconfig
 
       - name: Install Feeds
@@ -273,17 +273,17 @@ jobs:
           cd $OPENWRT_ROOT_PATH
           echo "dtparam=i2c_arm=on,audio=on" >> target/linux/bcm27xx/image/config.txt
           mkdir -p files/etc/uci-defaults/
-          cp ../scripts/init-settings.sh files/etc/uci-defaults/99-init-settings
+          cp $GITHUB_WORKSPACE/scripts/init-settings.sh files/etc/uci-defaults/99-init-settings
           mkdir -p files/www/snapshots
           cp -r bin/targets files/www/snapshots
           mkdir -p files/etc/opkg
-          cp ../data/opkg/distfeeds.conf files/etc/opkg
+          cp $GITHUB_WORKSPACE/data/opkg/distfeeds.conf files/etc/opkg
           # mkdir -p files/www/ipv6-modules
           # cp bin/packages/$PLATFORM/luci/luci-proto-ipv6* files/www/ipv6-modules
           # cp bin/packages/$PLATFORM/base/{ipv6helper*,odhcpd-ipv6only*,odhcp6c*,6in4*} "files/www/ipv6-modules"
           # cp bin/targets/$TARGET/$SUBTARGET/packages/{ip6tables*,kmod-nf-nat6*,kmod-ipt-nat6*,kmod-sit*,kmod-ip6tables-extra*} "files/www/ipv6-modules"
-          mkdir -p files/bin
-          cp ../scripts/ipv6-helper.sh files/bin/ipv6-helper
+          # mkdir -p files/bin
+          # cp $GITHUB_WORKSPACE/scripts/ipv6-helper.sh files/bin/ipv6-helper
           make package/install -j$(nproc) BUILD_LOG=1 || make package/install -j1 V=s
           make target/install -j$(nproc) BUILD_LOG=1 || make target/install -j1 V=s
           make json_overview_image_info
@@ -338,8 +338,8 @@ jobs:
         run: |
           cd $OPENWRT_ROOT_PATH
           rm -f .config
-          cp ../$CONFIG_FILE ./.config
-          cat ../config/packages-extra.config >> $OPENWRT_ROOT_PATH/.config
+          cp $GITHUB_WORKSPACE/$CONFIG_FILE .config
+          cat $GITHUB_WORKSPACE/config/packages-extra.config >> $OPENWRT_ROOT_PATH/.config
           sed -i '/CONFIG_ALL/d' $OPENWRT_ROOT_PATH/.config
           make defconfig
           make target/clean

@@ -238,7 +238,7 @@ jobs:
           cat config/firmware-extra.config >> $OPENWRT_ROOT_PATH/.config
           chmod +x $GITHUB_WORKSPACE/scripts/*.sh
           cd $OPENWRT_ROOT_PATH
-          $GITHUB_WORKSPACE/scripts/$DIY_SH
+          $GITHUB_WORKSPACE/$DIY_SH
           $GITHUB_WORKSPACE/scripts/preset-clash-core.sh armv8
           $GITHUB_WORKSPACE/scripts/preset-terminal-tools.sh
           make defconfig

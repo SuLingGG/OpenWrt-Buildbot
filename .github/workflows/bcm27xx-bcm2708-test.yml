@@ -210,6 +210,7 @@ jobs:
 
       - name: Prepare Toolchain Image
         run: |
+          cd workspace
           mkdir -p openwrt openwrt-ro workdir overlay
           sudo mount -o loop /data/toolchain/$TOOLCHAIN_IMAGE.img openwrt-ro
           sudo mount -t overlay overlay -o lowerdir=openwrt-ro,upperdir=overlay,workdir=workdir openwrt

@@ -6,420 +6,486 @@
 # Blog: https://p3terx.com
 #=================================================
 
-name: Build x86_64 OpenWrt
+name: Build x86/64 openwrt
 
 on:
-  repository_dispatch:
   workflow_dispatch:
-  schedule:
-    - cron: 0 8 * * 0,1,3,5
-#  watch:
-#    types: started
+  # schedule:
+  #   - cron: 0 6 * * 2,4,6
+  # watch:
+  #   types: started
 
 env:
-  REPO_URL: https://github.com/immortalwrt/immortalwrt
-  REPO_BRANCH: openwrt-18.06-k5.4
   CONFIG_FILE: config/x86/64.config
-  DIY_SH: scripts/project-openwrt.sh
-  WEBROOT: /data/dnmp/www/openwrt.cc
-  RUNNER: project-x86_64
+  SOURCE_URL: https://github.com/immortalwrt/immortalwrt
+  SOURCE_BRANCH: openwrt-18.06-k5.4
+  DIY_SH: scripts/custom.sh
+  WEB_ROOT_PATH: /data/dnmp/www/openwrt.cc
+  TOOLCHAIN_TAG: toolchain
+  FIRMWARE_RELEASE_UPLOAD: true
+  TZ: Asia/Shanghai
 
 jobs:
   Toolchain:
     runs-on: project-x86_64
 
     outputs:
-      TOOLCHAIN_STATUS: ${{ steps.toolchain.outputs.TOOLCHAIN_STATUS }}
+      OPENWRT_ROOT_PATH: ${{ steps.clone.outputs.OPENWRT_ROOT_PATH }}
+      CURRENT_BRANCH: ${{ steps.env.outputs.CURRENT_BRANCH }}
+      SOURCE_OWNER: ${{ steps.env.outputs.SOURCE_OWNER }}
+      SOURCE_REPO: ${{ steps.env.outputs.SOURCE_REPO }}
+      PLATFORM: ${{ steps.env.outputs.PLATFORM }}
+      TARGET: ${{ steps.env.outputs.TARGET }}
+      SUBTARGET: ${{ steps.env.outputs.SUBTARGET }}
+      TOOLCHAIN_IMAGE: ${{ steps.env.outputs.TOOLCHAIN_IMAGE }}
 
     steps:
-      - name: Umount Missing Loop Devices
-        id: umount
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Initialization Environment
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
           sudo umount /dev/loop*p1 || true
           sudo losetup -D || true
-          lsblk
+          sudo umount overlay || true
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804)
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+          mkdir -p workspace
+          fallocate -l 50G workspace.img
+          echo 'type=83' | sfdisk workspace.img
+          export WORKSPACE_LOOP_DEVNAME="$(sudo losetup -f -P --show workspace.img)"
+          echo "WORKSPACE_LOOP_DEVNAME=$WORKSPACE_LOOP_DEVNAME" >> $GITHUB_ENV
+          sudo mkfs.btrfs ${WORKSPACE_LOOP_DEVNAME}p1
+          sudo mount -o nossd,compress=zstd ${WORKSPACE_LOOP_DEVNAME}p1 workspace
+          sudo chown suling:suling workspace
+
+      - name: Clone Source Code
+        id: clone
+        run: |
+          df -hT $PWD
+          git clone $SOURCE_URL -b $SOURCE_BRANCH workspace/openwrt
+          cd workspace/openwrt
+          echo "OPENWRT_ROOT_PATH=$PWD" >> $GITHUB_ENV
+          echo "::set-output name=OPENWRT_ROOT_PATH::$(echo $PWD)"
+
+      - name: Generate Toolchain Config
+        run: |
+          [ -e $CONFIG_FILE ] && cp $CONFIG_FILE $OPENWRT_ROOT_PATH/.config
+          echo -e "\nCONFIG_ALL=y" >> $OPENWRT_ROOT_PATH/.config
+          echo -e "\nCONFIG_ALL_NONSHARED=y" >> $OPENWRT_ROOT_PATH/.config
+          cd $OPENWRT_ROOT_PATH
+          make defconfig > /dev/null 2>&1
+
+      - name: Generate Variables
+        id: env
+        run: |
+          export CURRENT_BRANCH="$(git symbolic-ref --short HEAD)"
+          echo "CURRENT_BRANCH=$CURRENT_BRANCH" >> $GITHUB_ENV
+          echo "::set-output name=CURRENT_BRANCH::$(echo $CURRENT_BRANCH)"
+          cd $OPENWRT_ROOT_PATH
+          export SOURCE_OWNER="$(echo $SOURCE_URL | awk -F '/' '{print $(NF-1)}')"
+          echo "SOURCE_OWNER=$SOURCE_OWNER" >> $GITHUB_ENV
+          echo "::set-output name=SOURCE_OWNER::$(echo $SOURCE_OWNER)"
+          export SOURCE_REPO="$(echo $SOURCE_URL | awk -F '/' '{print $(NF)}')"
+          echo "SOURCE_REPO=$SOURCE_REPO" >> $GITHUB_ENV
+          echo "::set-output name=SOURCE_REPO::$(echo $SOURCE_REPO)"
+          export TARGET=$(cat .config | grep CONFIG_TARGET_BOARD | awk -F '"' '{print $2}')
+          echo "TARGET=$TARGET" >> $GITHUB_ENV
+          echo "::set-output name=TARGET::$(echo $TARGET)"
+          export SUBTARGET=$(cat .config | grep CONFIG_TARGET_SUBTARGET | awk -F '"' '{print $2}')
+          echo "SUBTARGET=$SUBTARGET" >> $GITHUB_ENV
+          echo "::set-output name=SUBTARGET::$(echo $SUBTARGET)"
+          export PLATFORM=$(cat .config | grep CONFIG_TARGET_ARCH_PACKAGES | awk -F '"' '{print $2}')
+          echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
+          echo "::set-output name=PLATFORM::$(echo $PLATFORM)"
+          export TOOLCHAIN_IMAGE="toolchain-$SOURCE_OWNER-$SOURCE_REPO-$SOURCE_BRANCH-$TARGET-$SUBTARGET"
+          echo "TOOLCHAIN_IMAGE=$TOOLCHAIN_IMAGE" >> $GITHUB_ENV
+          echo "::set-output name=TOOLCHAIN_IMAGE::$(echo $TOOLCHAIN_IMAGE)"
+
+      - name: Compare Toolchain Hash
+        id: hash
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          export CURRENT_HASH=$(git log --pretty=tformat:"%H" -n1 tools toolchain)
+          echo "CURRENT_HASH=$CURRENT_HASH" >> $GITHUB_ENV
+          echo "::set-output name=CURRENT_HASH::$(echo $CURRENT_HASH)"
+          echo "CURRENT_HASH is $CURRENT_HASH"
+          export CACHE_HASH=$(cat /data/toolchain/$TOOLCHAIN_IMAGE.hash)
+          echo "CACHE_HASH is $CACHE_HASH"
+          if [ -z "$CACHE_HASH" ] || [ "$CURRENT_HASH" != "$CACHE_HASH" ]; then
+            echo "::set-output name=REBUILD_TOOLCHAIN::true"
+          fi
+
+      - name: Install Feeds
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          make defconfig > /dev/null 2>&1
+
+      - name: Compile Tools
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          echo -e "$(nproc) thread compile"
+          make tools/compile -j$(nproc) BUILD_LOG=1 || make tools/compile -j1 V=s
+
+      - name: Compile Toolchain
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          echo -e "$(nproc) thread compile"
+          make toolchain/compile -j$(nproc) BUILD_LOG=1 || make toolchain/compile -j1 V=s
+          rm -rf .config* bin dl
+
+      - name: Upload Job Logs
+        if: always()
+        uses: actions/upload-artifact@main
+        with:
+          name: Logs-${{ github.job }}
+          path: ${{ env.OPENWRT_ROOT_PATH }}/logs
+          if-no-files-found: ignore
+
+      - name: Collect Workflows Logs
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        run: |
+          mkdir -p output/logs
+          mv $OPENWRT_ROOT_PATH/logs output/logs/${{ github.job }}
+
+      - name: Generate Toolchain Image
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        run: |
+          mkdir -p /data/toolchain
+          cd workspace
+          mksquashfs openwrt /data/toolchain/$TOOLCHAIN_IMAGE.img -force-gid 1000 -force-uid 1000 -comp lz4
+          echo $CURRENT_HASH > /data/toolchain/$TOOLCHAIN_IMAGE.hash
+
+      - name: Clean Process
+        if: always()
+        run: |
+          sync
+          sudo umount ${WORKSPACE_LOOP_DEVNAME}p1 || true
+          sudo losetup -d $WORKSPACE_LOOP_DEVNAME || true
+          ls -A | xargs -I {} sudo rm -rf {} || true
+
+  Firmware:
+    needs: [Toolchain]
+    runs-on: project-x86_64
+
+    outputs:
+      WORKSPACE_LOOP_DEVNAME: ${{ steps.init.outputs.WORKSPACE_LOOP_DEVNAME }}
+
+    steps:
+      - name: Restore Variables
+        run: |
+          echo "OPENWRT_ROOT_PATH=$(echo '${{needs.Toolchain.outputs.OPENWRT_ROOT_PATH}}')" >> $GITHUB_ENV
+          echo "CURRENT_BRANCH=$(echo '${{needs.Toolchain.outputs.CURRENT_BRANCH}}')" >> $GITHUB_ENV
+          echo "SOURCE_OWNER=$(echo '${{needs.Toolchain.outputs.SOURCE_OWNER}}')" >> $GITHUB_ENV
+          echo "SOURCE_REPO=$(echo '${{needs.Toolchain.outputs.SOURCE_REPO}}')" >> $GITHUB_ENV
+          echo "PLATFORM=$(echo '${{needs.Toolchain.outputs.PLATFORM}}')" >> $GITHUB_ENV
+          echo "TARGET=$(echo '${{needs.Toolchain.outputs.TARGET}}')" >> $GITHUB_ENV
+          echo "SUBTARGET=$(echo '${{needs.Toolchain.outputs.SUBTARGET}}')" >> $GITHUB_ENV
+          echo "TOOLCHAIN_IMAGE=$(echo '${{needs.Toolchain.outputs.TOOLCHAIN_IMAGE}}')" >> $GITHUB_ENV
 
       - name: Checkout
         uses: actions/checkout@main
 
       - name: Initialization Environment
         id: init
+        run: |
+          mkdir -p workspace
+          fallocate -l 150G workspace.img
+          echo 'type=83' | sfdisk workspace.img
+          export WORKSPACE_LOOP_DEVNAME="$(sudo losetup -f -P --show workspace.img)"
+          echo "WORKSPACE_LOOP_DEVNAME=$WORKSPACE_LOOP_DEVNAME" >> $GITHUB_ENV
+          echo "::set-output name=WORKSPACE_LOOP_DEVNAME::$(echo $WORKSPACE_LOOP_DEVNAME)"
+          sudo mkfs.btrfs ${WORKSPACE_LOOP_DEVNAME}p1
+          sudo mount -o nossd,compress=zstd ${WORKSPACE_LOOP_DEVNAME}p1 workspace
+          sudo chown suling:suling workspace
+
+      - name: Prepare Toolchain Image
+        run: |
+          cd workspace
+          mkdir -p openwrt openwrt-ro workdir overlay
+          sudo mount -o loop /data/toolchain/$TOOLCHAIN_IMAGE.img openwrt-ro
+          sudo mount -t overlay overlay -o lowerdir=openwrt-ro,upperdir=overlay,workdir=workdir openwrt
+          sudo chown suling:suling $OPENWRT_ROOT_PATH
+          cd $OPENWRT_ROOT_PATH
+          git pull
+
+      - name: Import Build Keys
         env:
-          DEBIAN_FRONTEND: noninteractive
+          BUILD_PRIVATEKEY: ${{ secrets.BUILD_PRIVATEKEY }}
+          BUILD_PUBLICKEY: ${{ secrets.BUILD_PUBLICKEY }}
+        if: env.BUILD_PRIVATEKEY != null && env.BUILD_PUBLICKEY != null
         run: |
-          sudo -E apt-get -qq update
-          sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804)
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
-          sudo umount /dev/loop*p1 || true
-          sudo losetup -D || true
-          rm -rf openwrt.img
-          fallocate -l 150G openwrt.img
-          echo 'type=83' | sfdisk openwrt.img
-          export LOOP="$(sudo losetup -f -P --show openwrt.img)"
-          echo "LOOP=$LOOP" >> $GITHUB_ENV
-          echo "::set-output name=LOOP::$(echo $LOOP)"
-          sudo mkfs.ext4 ${LOOP}p1
-          mkdir -p openwrt
-          sudo mount ${LOOP}p1 openwrt
-          lsblk
-          sudo chown -R suling:suling openwrt
-          cd openwrt
-          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
-
-      - name: Clone Source Code
-        id: clone
-        run: |
-          df -hT $PWD
-          git clone --depth 1 $REPO_URL -b $REPO_BRANCH
-          mv immortalwrt/* openwrt
-          mv immortalwrt/.git* openwrt
-
-      - name: Update Feeds
-        id: update
-        run: |
-          cd $OPENWRTROOT
-          ./scripts/feeds update -a
-
-      - name: Install Feeds
-        id: install
-        run: |
-          cd $OPENWRTROOT
-          ./scripts/feeds install -a
+          cd $OPENWRT_ROOT_PATH
+          echo -e "$BUILD_PRIVATEKEY" > key-build
+          echo -e "$BUILD_PUBLICKEY" > key-build.pub
+          wc -c key-build key-build.pub
+          export PUBLICKEY_FINGERPRINT=$(usign -F -p key-build.pub)
+          mkdir -p files/etc/opkg/keys
+          cp key-build.pub files/etc/opkg/keys/$PUBLICKEY_FINGERPRINT
 
       - name: Load Custom Configuration
         run: |
-          [ -e files ] && mv files $OPENWRTROOT/files
-          cd $OPENWRTROOT
-          chmod +x ../scripts/*.sh
-          ../$DIY_SH
-          ../scripts/preset-clash-core.sh amd64
-          ../scripts/preset-terminal-tools.sh
+          [ -e files ] && mv files $OPENWRT_ROOT_PATH/files
+          [ -e $CONFIG_FILE ] && cp $CONFIG_FILE $OPENWRT_ROOT_PATH/.config
+          cat config/firmware-extra.config >> $OPENWRT_ROOT_PATH/.config
+          chmod +x $GITHUB_WORKSPACE/scripts/*.sh
+          cd $OPENWRT_ROOT_PATH
+          $GITHUB_WORKSPACE/$DIY_SH
+          $GITHUB_WORKSPACE/scripts/preset-clash-core.sh amd64
+          $GITHUB_WORKSPACE/scripts/preset-terminal-tools.sh
+          make defconfig
 
-      - name: Download All Packages
-        id: download
+      - name: Install Feeds
         run: |
-          cd $OPENWRTROOT
-          wget -q https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
+          cd $OPENWRT_ROOT_PATH
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Download DL Package
+        run: |
+          cd $OPENWRT_ROOT_PATH
           rm -rf dl
-          cp -r /data/cache/dl .
-          echo "CONFIG_ALL=y" >> .config
-          make defconfig
-          make download -j16 IGNORE_ERRORS=1
-          find dl -size -1024c -exec ls -l {} \;
-          find dl -size -1024c -exec rm -f {} \;
+          cp -rf /data/cache/dl .
+          make download -j64
 
-      - name: Compile Tools
-        id: tools
+      - name: Compile Packages
         run: |
-          rm -f $OPENWRTROOT/.config*
-          cp $CONFIG_FILE $OPENWRTROOT/.config
-          cat config/firmware-extra.config >> $OPENWRTROOT/.config
-          cat config/base-wireless-support.config >> $OPENWRTROOT/.config
-          cd $OPENWRTROOT
-          make defconfig
-          echo -e "$(nproc) threads compile"
-          make tools/install -j$(nproc) BUILD_LOG=1 || make tools/install -j1 V=s
-
-      - name: Compile Toolchain
-        id: toolchain
-        run: |
-          cd $OPENWRTROOT
-          echo -e "$(nproc) threads compile"
-          make toolchain/compile -j$(nproc) BUILD_LOG=1 || make toolchain/compile -j1 V=s
-          echo "::set-output name=TOOLCHAIN_STATUS::success"
-
-      - name: Collect Logs
-        id: toolchain-logs-collect
-        if: always()
-        run: |
-          cd $OPENWRTROOT
-          mkdir -p output/logs
-          mv logs output/logs/${{ github.job }}
-
-      - name: Upload Logs
-        id: toolchain-logs-upload
-        if: always()
-        uses: actions/upload-artifact@main
-        with:
-          name: Logs-${{ github.job }}
-          path: openwrt/output/logs/${{ github.job }}
-
-      - name: Umount Disk Image
-        id: prepare
-        if: always()
-        run: |
-          sync
-          sudo umount ${LOOP}p1 || true
-          sudo losetup -d $LOOP || true
-          lsblk
-
-  Firmware:
-    if: needs.Toolchain.outputs.TOOLCHAIN_STATUS == 'success'
-    needs: [Toolchain]
-    runs-on: project-x86_64
-
-    outputs:
-      PLATFORM: ${{ steps.compile.outputs.PLATFORM }}
-      TARGET: ${{ steps.compile.outputs.TARGET }}
-      SUBTARGET: ${{ steps.compile.outputs.SUBTARGET }}
-      GENERATE_STATUS: ${{ steps.generate.outputs.GENERATE_STATUS }}
-
-    steps:
-      - name: Initialization Environment
-        id: init
-        run: |
-          export LOOP="$(sudo losetup -f -P --show openwrt.img)"
-          echo "LOOP=$LOOP" >> $GITHUB_ENV
-          echo "::set-output name=LOOP::$(echo $LOOP)"
-          mkdir -p openwrt
-          sudo mount ${LOOP}p1 openwrt
-          lsblk
-          sudo chown -R suling:suling openwrt
-          cd openwrt
-          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
-
-      - name: Compile Firmware Packages
-        id: compile
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        timeout-minutes: 330
-        run: |
-          cd $OPENWRTROOT
-          echo -e "$(nproc) threads compile"
+          cd $OPENWRT_ROOT_PATH
+          echo -e "$(nproc) thread compile"
+          make buildinfo
+          make diffconfig buildversion feedsversion
           make target/compile -j$(nproc) 'IGNORE_ERRORS=n m' BUILD_LOG=1 || make target/compile -j1 V=s IGNORE_ERRORS=1
-          make diffconfig
           make package/compile -j$(nproc) 'IGNORE_ERRORS=n m' BUILD_LOG=1 || make package/compile -j1 V=s
           make package/index
-          cd $OPENWRTROOT/bin/packages/*
-          PLATFORM=$(basename `pwd`)
-          echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
-          echo "::set-output name=PLATFORM::$(echo $PLATFORM)"
-          cd $OPENWRTROOT/bin/targets/*
-          TARGET=$(basename `pwd`)
-          echo "TARGET=$TARGET" >> $GITHUB_ENV
-          echo "::set-output name=TARGET::$(echo $TARGET)"
-          cd *
-          SUBTARGET=$(basename `pwd`)
-          echo "SUBTARGET=$SUBTARGET" >> $GITHUB_ENV
-          echo "::set-output name=SUBTARGET::$(echo $SUBTARGET)"
-          echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-          echo "::set-output name=FIRMWARE::$(echo $PWD)"
-          echo "::set-output name=COMPILE_STATUS::success"
 
       - name: Generate Firmware
-        if: steps.compile.outputs.COMPILE_STATUS == 'success'
-        id: generate
         run: |
           cd data/opkg
           sed -i "s/subtarget/$SUBTARGET/g" distfeeds.conf
           sed -i "s/target\//$TARGET\//g" distfeeds.conf
           sed -i "s/platform/$PLATFORM/g" distfeeds.conf
-          cd $OPENWRTROOT
-          mkdir -p files/etc/opkg
-          cp ../data/opkg/distfeeds.conf files/etc/opkg/distfeeds.conf
+          cd $OPENWRT_ROOT_PATH
+          echo "dtparam=i2c_arm=on,audio=on" >> target/linux/bcm27xx/image/config.txt
+          mkdir -p files/etc/uci-defaults/
+          cp $GITHUB_WORKSPACE/scripts/init-settings.sh files/etc/uci-defaults/99-init-settings
           mkdir -p files/www/snapshots
           cp -r bin/targets files/www/snapshots
-          mkdir -p files/etc/uci-defaults/
-          cp ../scripts/init-settings.sh files/etc/uci-defaults/99-init-settings
-          mkdir -p files/bin
-          cp ../scripts/ipv6-helper.sh files/bin/ipv6-helper
-          make package/install || make package/install -j1 V=s
-          make target/install || make target/install -j1 V=s
+          mkdir -p files/etc/opkg
+          cp $GITHUB_WORKSPACE/data/opkg/distfeeds.conf files/etc/opkg
+          make package/install -j$(nproc) BUILD_LOG=1 || make package/install -j1 V=s
+          make target/install -j$(nproc) BUILD_LOG=1 || make target/install -j1 V=s
+          make json_overview_image_info
           make checksum
-          mkdir -p $OPENWRTROOT/output/bin/targets/$TARGET
-          cp -r $FIRMWARE $OPENWRTROOT/output/bin/targets/$TARGET
-          echo "::set-output name=GENERATE_STATUS::success"
+          cp key-build.pub bin/targets/$TARGET/$SUBTARGET
+          mkdir -p $GITHUB_WORKSPACE/output/bin/targets/$TARGET
+          mv bin/targets/$TARGET/$SUBTARGET $GITHUB_WORKSPACE/output/bin/targets/$TARGET
 
-      - name: Collect Logs
-        id: firmware-logs-collect
-        if: always()
-        run: |
-          cd $OPENWRTROOT
-          mv logs output/logs/${{ github.job }}
-
-      - name: Upload Logs
-        id: firmware-logs-upload
+      - name: Upload Job Logs
         if: always()
         uses: actions/upload-artifact@main
         with:
           name: Logs-${{ github.job }}
-          path: openwrt/output/logs/${{ github.job }}
+          path: ${{ env.OPENWRT_ROOT_PATH }}/logs
+          if-no-files-found: ignore
 
-      - name: Umount Disk Image
-        if: always()
-        id: prepare
+      - name: Collect Workflows Logs
+        run: |
+          mkdir -p output/logs
+          mv $OPENWRT_ROOT_PATH/logs output/logs/${{ github.job }}
+
+      - name: Clean Process
+        if: failure()
         run: |
           sync
-          sudo umount ${LOOP}p1 || true
-          sudo losetup -d $LOOP || true
-          lsblk
+          sudo umount $OPENWRT_ROOT_PATH || true
+          sudo umount workspace/openwrt-ro || true
+          sudo umount ${WORKSPACE_LOOP_DEVNAME}p1 || true
+          sudo losetup -d $WORKSPACE_LOOP_DEVNAME || true
+          ls -A | xargs -I {} rm -rf {} || true
 
   Extra-Packages:
-    if: needs.Firmware.outputs.GENERATE_STATUS == 'success'
-    needs: [Firmware]
+    needs: [Toolchain, Firmware]
     runs-on: project-x86_64
-
-    outputs:
-      COMPILE_STATUS: ${{ steps.compile.outputs.COMPILE_STATUS }}
 
     steps:
       - name: Restore Variables
-        id: restore
         run: |
-          echo "PLATFORM=$(echo '${{needs.Firmware.outputs.PLATFORM}}')" >> $GITHUB_ENV
-          echo "TARGET=$(echo '${{needs.Firmware.outputs.TARGET}}')" >> $GITHUB_ENV
-          echo "SUBTARGET=$(echo '${{needs.Firmware.outputs.SUBTARGET}}')" >> $GITHUB_ENV
+          echo "WORKSPACE_LOOP_DEVNAME=$(echo '${{needs.Toolchain.outputs.WORKSPACE_LOOP_DEVNAME}}')" >> $GITHUB_ENV
+          echo "OPENWRT_ROOT_PATH=$(echo '${{needs.Toolchain.outputs.OPENWRT_ROOT_PATH}}')" >> $GITHUB_ENV
+          echo "CURRENT_BRANCH=$(echo '${{needs.Toolchain.outputs.CURRENT_BRANCH}}')" >> $GITHUB_ENV
+          echo "SOURCE_OWNER=$(echo '${{needs.Toolchain.outputs.SOURCE_OWNER}}')" >> $GITHUB_ENV
+          echo "SOURCE_REPO=$(echo '${{needs.Toolchain.outputs.SOURCE_REPO}}')" >> $GITHUB_ENV
+          echo "PLATFORM=$(echo '${{needs.Toolchain.outputs.PLATFORM}}')" >> $GITHUB_ENV
+          echo "TARGET=$(echo '${{needs.Toolchain.outputs.TARGET}}')" >> $GITHUB_ENV
+          echo "SUBTARGET=$(echo '${{needs.Toolchain.outputs.SUBTARGET}}')" >> $GITHUB_ENV
+          echo "TOOLCHAIN_IMAGE=$(echo '${{needs.Toolchain.outputs.TOOLCHAIN_IMAGE}}')" >> $GITHUB_ENV
 
-      - name: Initialization Environment
-        id: init
+      - name: Clean Build Cache
         run: |
-          export LOOP="$(sudo losetup -f -P --show openwrt.img)"
-          echo "LOOP=$LOOP" >> $GITHUB_ENV
-          echo "::set-output name=LOOP::$(echo $LOOP)"
-          mkdir -p openwrt
-          sudo mount ${LOOP}p1 openwrt
-          lsblk
-          sudo chown -R suling:suling openwrt
-          cd openwrt
-          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
-
-      - name: Compile Extra Packages
-        id: compile
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        timeout-minutes: 330
-        run: |
-          cd $OPENWRTROOT
-          rm -f .config*
-          cp ../$CONFIG_FILE ./.config
-          cat ../config/packages-extra.config >> $OPENWRTROOT/.config
-          make defconfig
-          make diffconfig
+          cd $OPENWRT_ROOT_PATH
           make target/clean
           make package/libs/mbedtls/clean
-          make target/compile -j$(nproc) 'IGNORE_ERRORS=n m' BUILD_LOG=1 || make target/compile -j1 V=s IGNORE_ERRORS=1
+
+      - name: Import Build Keys
+        env:
+          BUILD_PRIVATEKEY: ${{ secrets.BUILD_PRIVATEKEY }}
+          BUILD_PUBLICKEY: ${{ secrets.BUILD_PUBLICKEY }}
+        if: env.BUILD_PRIVATEKEY != null && env.BUILD_PUBLICKEY != null
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          echo -e "$BUILD_PRIVATEKEY" > key-build
+          echo -e "$BUILD_PUBLICKEY" > key-build.pub
+          wc -c key-build key-build.pub
+          export PUBLICKEY_FINGERPRINT=$(usign -F -p key-build.pub)
+          mkdir -p files/etc/opkg/keys
+          cp key-build.pub files/etc/opkg/keys/$PUBLICKEY_FINGERPRINT
+
+      - name: Compile Extra Packages
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          rm -f .config
+          cp $GITHUB_WORKSPACE/$CONFIG_FILE .config
+          cat $GITHUB_WORKSPACE/config/packages-extra.config >> $OPENWRT_ROOT_PATH/.config
+          make defconfig
+          make target/compile -j$(nproc) IGNORE_ERRORS="m n" BUILD_LOG=1 || make target/compile -j1 V=s IGNORE_ERRORS="m n"
           make package/compile -j$(nproc) BUILD_LOG=1 IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
           make package/index
-          mkdir -p $OPENWRTROOT/output/bin/packages
-          cp -r bin/packages/$PLATFORM $OPENWRTROOT/output/bin/packages
-          echo "::set-output name=COMPILE_STATUS::success"
+          mkdir -p $GITHUB_WORKSPACE/output/bin/packages
+          mv bin/packages/$PLATFORM $GITHUB_WORKSPACE/output/bin/packages
 
-      - name: Collect Logs
-        id: packages-logs-collect
+      - name: Upload Job Logs
         if: always()
+        uses: actions/upload-artifact@main
+        with:
+          name: Logs-${{ github.job }}
+          path: ${{ env.OPENWRT_ROOT_PATH }}/logs
+          if-no-files-found: ignore
+
+      - name: Collect Workflows Logs
         run: |
-          cd $OPENWRTROOT
-          mv logs output/logs/${{ github.job }}
-          [ -e output/bin/targets/$TARGET/$SUBTARGET ] && cp -r output/logs output/bin/targets/$TARGET/$SUBTARGET
+          mkdir -p output/logs
+          mv $OPENWRT_ROOT_PATH/logs output/logs/${{ github.job }}
+          mv output/logs output/bin/targets/$TARGET/$SUBTARGET
 
       - name: Compress Bin Folder
-        if: steps.compile.outputs.COMPILE_STATUS == 'success'
-        id: compress
         run: |
-          cd $OPENWRTROOT/output
-          zip -q -s 500m -r bin-archive.zip bin
-          rm -rf bin
+          cd output
+          zip -s 1900m -qrm bin-archive.zip bin
 
       - name: Upload Bin Archive
-        id: upload
         uses: actions/upload-artifact@main
         with:
           name: Bin-Archive
-          path: openwrt/output
+          path: output
 
-      - name: Upload Logs
-        id: packages-logs-upload
+      - name: Clean Process
         if: always()
-        uses: actions/upload-artifact@main
-        with:
-          name: Logs-${{ github.job }}
-          path: openwrt/output/logs/${{ github.job }}
-
-      - name: Umount Disk Image
-        if: always()
-        id: prepare
         run: |
           sync
-          sudo umount ${LOOP}p1 || true
-          sudo losetup -d $LOOP || true
-          lsblk
+          sudo umount $OPENWRT_ROOT_PATH || true
+          sudo umount workspace/openwrt-ro || true
+          sudo umount ${WORKSPACE_LOOP_DEVNAME}p1 || true
+          sudo losetup -d $WORKSPACE_LOOP_DEVNAME || true
+          ls -A | xargs -I {} rm -rf {} || true
 
   Upload:
-    if: needs.Extra-Packages.outputs.COMPILE_STATUS == 'success'
-    needs: [Extra-Packages, Firmware]
-    runs-on: ubuntu-18.04
+    needs: [Toolchain, Firmware, Extra-Packages]
+    runs-on: ubuntu-20.04
 
     steps:
       - name: Restore Variables
-        id: restore
         run: |
-          echo "PLATFORM=$(echo '${{needs.Firmware.outputs.PLATFORM}}')" >> $GITHUB_ENV
-          echo "TARGET=$(echo '${{needs.Firmware.outputs.TARGET}}')" >> $GITHUB_ENV
-          echo "SUBTARGET=$(echo '${{needs.Firmware.outputs.SUBTARGET}}')" >> $GITHUB_ENV
+          sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+          echo "CURRENT_BRANCH=$(echo '${{needs.Toolchain.outputs.CURRENT_BRANCH}}')" >> $GITHUB_ENV
+          echo "SOURCE_OWNER=$(echo '${{needs.Toolchain.outputs.SOURCE_OWNER}}')" >> $GITHUB_ENV
+          echo "SOURCE_REPO=$(echo '${{needs.Toolchain.outputs.SOURCE_REPO}}')" >> $GITHUB_ENV
+          echo "PLATFORM=$(echo '${{needs.Toolchain.outputs.PLATFORM}}')" >> $GITHUB_ENV
+          echo "TARGET=$(echo '${{needs.Toolchain.outputs.TARGET}}')" >> $GITHUB_ENV
+          echo "SUBTARGET=$(echo '${{needs.Toolchain.outputs.SUBTARGET}}')" >> $GITHUB_ENV
+          echo "TOOLCHAIN_IMAGE=$(echo '${{needs.Toolchain.outputs.TOOLCHAIN_IMAGE}}')" >> $GITHUB_ENV
 
       - name: Download Bin Archive
-        id: download
         uses: actions/download-artifact@v2
         with:
           name: Bin-Archive
           path: openwrt
 
-      - name: Decompress Bin Folder
-        id: decompress
+      - name: Decompress Bin Archive
         run: |
-          sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
           cd openwrt
-          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
-          zip -q -s 0 bin-archive.zip --out $TARGET-$SUBTARGET.zip
+          echo "OPENWRT_ROOT_PATH=$PWD" >> $GITHUB_ENV
+          zip -qs 0 bin-archive.zip --out $TARGET-$SUBTARGET.zip
           unzip $TARGET-$SUBTARGET.zip
 
       - name: Deploy Files To HostHatch Node
-        id: hosthatch
         env:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
-          SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
-          SOURCE_PACKAGES: "openwrt/bin/packages/${{ env.PLATFORM }}/"
-          DEST_TARGETS: "${{ env.WEBROOT }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
-          DEST_PACKAGES: "${{ env.WEBROOT }}/snapshots/packages/${{ env.PLATFORM }}/"
-          REMOTE_PRIVATEKEY: "${{secrets.HOSTHATCH_PRIVATEKEY}}"
+          SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          SOURCE_PACKAGES: "${{ env.OPENWRT_ROOT_PATH }}/bin/packages/${{ env.PLATFORM }}/"
+          DEST_TARGETS: "${{ env.WEB_ROOT_PATH }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          DEST_PACKAGES: "${{ env.WEB_ROOT_PATH }}/snapshots/packages/${{ env.PLATFORM }}/"
+          REMOTE_PRIVATEKEY: "${{ secrets.HOSTHATCH_PRIVATEKEY }}"
         if: env.REMOTE_PRIVATEKEY != null
         run: |
           mkdir -p ~/.ssh/
           install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{secrets.HOSTHATCH_PRIVATEKEY}}" > ~/.ssh/id_rsa
+          echo "${{ secrets.HOSTHATCH_PRIVATEKEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET \
-          $WEBROOT/snapshots/packages/$PLATFORM'"
+          bash -c "'mkdir -p $WEB_ROOT_PATH/snapshots/targets/$TARGET/$SUBTARGET \
+          $WEB_ROOT_PATH/snapshots/packages/$PLATFORM'"
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
 
       - name: Deploy Files To PacificRack Node
-        id: pacificrack
         env:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.PACIFICRACK_IP }}"
-          SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
-          SOURCE_PACKAGES: "openwrt/bin/packages/${{ env.PLATFORM }}/"
-          DEST_TARGETS: "${{ env.WEBROOT }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
-          DEST_PACKAGES: "${{ env.WEBROOT }}/snapshots/packages/${{ env.PLATFORM }}/"
-          REMOTE_PRIVATEKEY: "${{secrets.PACIFICRACK_PRIVATEKEY}}"
+          SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          SOURCE_PACKAGES: "${{ env.OPENWRT_ROOT_PATH }}/bin/packages/${{ env.PLATFORM }}/"
+          DEST_TARGETS: "${{ env.WEB_ROOT_PATH }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
+          DEST_PACKAGES: "${{ env.WEB_ROOT_PATH }}/snapshots/packages/${{ env.PLATFORM }}/"
+          REMOTE_PRIVATEKEY: "${{ secrets.PACIFICRACK_PRIVATEKEY }}"
         if: env.REMOTE_PRIVATEKEY != null
         run: |
           mkdir -p ~/.ssh/
           install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{secrets.PACIFICRACK_PRIVATEKEY}}" > ~/.ssh/id_rsa
+          echo "${{ secrets.PACIFICRACK_PRIVATEKEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $WEBROOT/snapshots/targets/$TARGET/$SUBTARGET \
-          $WEBROOT/snapshots/packages/$PLATFORM'"
+          bash -c "'mkdir -p $WEB_ROOT_PATH/snapshots/targets/$TARGET/$SUBTARGET \
+          $WEB_ROOT_PATH/snapshots/packages/$PLATFORM'"
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
 
+      - name: Organize Files
+        run: |
+          cd $OPENWRT_ROOT_PATH/bin/targets/$TARGET/$SUBTARGET
+          rm -rf packages logs
+
+      - name: Deploy Files To Release
+        uses: ncipollo/release-action@v1.8.0
+        if: env.FIRMWARE_RELEASE_UPLOAD == 'true'
+        with:
+          name: openwrt-${{ env.TARGET }}-${{ env.SUBTARGET }}
+          allowUpdates: true
+          replacesArtifacts: true
+          tag: ${{ env.TARGET }}-${{ env.SUBTARGET }}
+          commit: ${{ env.CURRENT_BRANCH }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: ${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/*
+
       - name: Deploy Files To Onedrive
-        id: onedrive
         env:
-          SOURCE_TARGETS: "openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}"
+          SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}"
           DEST_TARGETS: "snapshots/targets/${{ env.TARGET }}"
           ONEDRIVEUPLOADER_CONF: "${{ secrets.ONEDRIVEUPLOADER_CONF }}"
         if: env.ONEDRIVEUPLOADER_CONF != null
@@ -430,4 +496,4 @@ jobs:
           rm -rf $SOURCE_TARGETS/packages $SOURCE_TARGETS/logs
           ./OneDriveUploader -f -c "./auth.json" -s $SOURCE_TARGETS -r $DEST_TARGETS
           ./OneDriveUploader -f -c "./auth.json" -s $SOURCE_TARGETS -r "archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET/$SUBTARGET"
-          ./OneDriveUploader -f -c "./auth.json" -s $OPENWRTROOT/$TARGET-$SUBTARGET.zip -r "archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/bin-archive"
+          ./OneDriveUploader -f -c "./auth.json" -s $OPENWRT_ROOT_PATH/$TARGET-$SUBTARGET.zip -r "archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/bin-archive"

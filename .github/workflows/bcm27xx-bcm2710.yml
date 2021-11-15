@@ -319,7 +319,7 @@ jobs:
     steps:
       - name: Restore Variables
         run: |
-          echo "WORKSPACE_LOOP_DEVNAME=$(echo '${{needs.Toolchain.outputs.WORKSPACE_LOOP_DEVNAME}}')" >> $GITHUB_ENV
+          echo "WORKSPACE_LOOP_DEVNAME=$(echo '${{needs.Firmware.outputs.WORKSPACE_LOOP_DEVNAME}}')" >> $GITHUB_ENV
           echo "OPENWRT_ROOT_PATH=$(echo '${{needs.Toolchain.outputs.OPENWRT_ROOT_PATH}}')" >> $GITHUB_ENV
           echo "CURRENT_BRANCH=$(echo '${{needs.Toolchain.outputs.CURRENT_BRANCH}}')" >> $GITHUB_ENV
           echo "SOURCE_OWNER=$(echo '${{needs.Toolchain.outputs.SOURCE_OWNER}}')" >> $GITHUB_ENV
@@ -482,18 +482,3 @@ jobs:
           commit: ${{ env.CURRENT_BRANCH }}
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: ${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/*
-
-      - name: Deploy Files To Onedrive
-        env:
-          SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}"
-          DEST_TARGETS: "snapshots/targets/${{ env.TARGET }}"
-          ONEDRIVEUPLOADER_CONF: "${{ secrets.ONEDRIVEUPLOADER_CONF }}"
-        if: env.ONEDRIVEUPLOADER_CONF != null
-        run: |
-          echo -e "${ONEDRIVEUPLOADER_CONF}" | tee ./auth.json > /dev/null
-          wget -q https://raw.githubusercontent.com/MoeClub/OneList/master/OneDriveUploader/amd64/linux/OneDriveUploader
-          chmod +x OneDriveUploader
-          rm -rf $SOURCE_TARGETS/packages $SOURCE_TARGETS/logs
-          ./OneDriveUploader -f -c "./auth.json" -s $SOURCE_TARGETS -r $DEST_TARGETS
-          ./OneDriveUploader -f -c "./auth.json" -s $SOURCE_TARGETS -r "archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/targets/$TARGET/$SUBTARGET"
-          ./OneDriveUploader -f -c "./auth.json" -s $OPENWRT_ROOT_PATH/$TARGET-$SUBTARGET.zip -r "archive/$(date +%Y)/$(date +%m)/$(date +%d)/snapshots/bin-archive"

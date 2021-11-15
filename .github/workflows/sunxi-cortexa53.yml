@@ -40,6 +40,12 @@ jobs:
       TOOLCHAIN_IMAGE: ${{ steps.env.outputs.TOOLCHAIN_IMAGE }}
 
     steps:
+      - name: Clean Environment
+        run: |
+          sudo umount /dev/loop*p1 || true
+          sudo losetup -D || true
+          sudo umount overlay || true
+
       - name: Checkout
         uses: actions/checkout@main
 
@@ -47,9 +53,6 @@ jobs:
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo umount /dev/loop*p1 || true
-          sudo losetup -D || true
-          sudo umount overlay || true
           sudo -E apt-get -qq update
           sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804)
           sudo -E apt-get -qq autoremove --purge

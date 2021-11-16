@@ -324,7 +324,7 @@ jobs:
           ls -A | xargs -I {} rm -rf {} || true
 
   Upload:
-    needs: [Toolchain, Firmware, Extra-Packages]
+    needs: [Toolchain, Firmware]
     runs-on: ubuntu-20.04
 
     steps:

@@ -58,13 +58,6 @@ jobs:
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
           mkdir -p workspace
-          fallocate -l 50G workspace.img
-          echo 'type=83' | sfdisk workspace.img
-          export WORKSPACE_LOOP_DEVNAME="$(sudo losetup -f -P --show workspace.img)"
-          echo "WORKSPACE_LOOP_DEVNAME=$WORKSPACE_LOOP_DEVNAME" >> $GITHUB_ENV
-          sudo mkfs.btrfs ${WORKSPACE_LOOP_DEVNAME}p1
-          sudo mount -o nossd,compress=zstd ${WORKSPACE_LOOP_DEVNAME}p1 workspace
-          sudo chown suling:suling workspace
 
       - name: Clone Source Code
         id: clone
@@ -172,9 +165,9 @@ jobs:
         if: always()
         run: |
           sync
-          sudo umount ${WORKSPACE_LOOP_DEVNAME}p1 || true
-          sudo losetup -d $WORKSPACE_LOOP_DEVNAME || true
-          ls -A | xargs -I {} sudo rm -rf {} || true
+          mkdir empty
+          rsync --delete-before --force -r empty/ workspace/
+          rm -rf empty workspace
 
   Firmware:
     needs: [Toolchain]
@@ -198,21 +191,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@main
 
-      - name: Initialization Environment
-        id: init
-        run: |
-          mkdir -p workspace
-          fallocate -l 150G workspace.img
-          echo 'type=83' | sfdisk workspace.img
-          export WORKSPACE_LOOP_DEVNAME="$(sudo losetup -f -P --show workspace.img)"
-          echo "WORKSPACE_LOOP_DEVNAME=$WORKSPACE_LOOP_DEVNAME" >> $GITHUB_ENV
-          echo "::set-output name=WORKSPACE_LOOP_DEVNAME::$(echo $WORKSPACE_LOOP_DEVNAME)"
-          sudo mkfs.btrfs ${WORKSPACE_LOOP_DEVNAME}p1
-          sudo mount -o nossd,compress=zstd ${WORKSPACE_LOOP_DEVNAME}p1 workspace
-          sudo chown suling:suling workspace
-
       - name: Prepare Toolchain Image
         run: |
+          mkdir -p workspace
           cd workspace
           mkdir -p openwrt openwrt-ro workdir overlay
           sudo mount -o loop /data/toolchain/$TOOLCHAIN_IMAGE.img openwrt-ro
@@ -311,9 +292,9 @@ jobs:
           sync
           sudo umount $OPENWRT_ROOT_PATH || true
           sudo umount workspace/openwrt-ro || true
-          sudo umount ${WORKSPACE_LOOP_DEVNAME}p1 || true
-          sudo losetup -d $WORKSPACE_LOOP_DEVNAME || true
-          ls -A | xargs -I {} rm -rf {} || true
+          mkdir empty
+          rsync --delete-before --force -r empty/ workspace/
+          rm -rf empty workspace
 
   Extra-Packages:
     needs: [Toolchain, Firmware]
@@ -322,7 +303,6 @@ jobs:
     steps:
       - name: Restore Variables
         run: |
-          echo "WORKSPACE_LOOP_DEVNAME=$(echo '${{needs.Firmware.outputs.WORKSPACE_LOOP_DEVNAME}}')" >> $GITHUB_ENV
           echo "OPENWRT_ROOT_PATH=$(echo '${{needs.Toolchain.outputs.OPENWRT_ROOT_PATH}}')" >> $GITHUB_ENV
           echo "CURRENT_BRANCH=$(echo '${{needs.Toolchain.outputs.CURRENT_BRANCH}}')" >> $GITHUB_ENV
           echo "SOURCE_OWNER=$(echo '${{needs.Toolchain.outputs.SOURCE_OWNER}}')" >> $GITHUB_ENV
@@ -395,9 +375,9 @@ jobs:
           sync
           sudo umount $OPENWRT_ROOT_PATH || true
           sudo umount workspace/openwrt-ro || true
-          sudo umount ${WORKSPACE_LOOP_DEVNAME}p1 || true
-          sudo losetup -d $WORKSPACE_LOOP_DEVNAME || true
-          ls -A | xargs -I {} rm -rf {} || true
+          mkdir empty
+          rsync --delete-before --force -r empty/ workspace/
+          rm -rf empty workspace
 
   Upload:
     needs: [Toolchain, Firmware, Extra-Packages]

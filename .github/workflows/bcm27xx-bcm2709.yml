@@ -166,8 +166,8 @@ jobs:
         run: |
           sync
           mkdir empty
-          rsync --delete-before --force -r empty/ workspace/
-          rm -rf empty workspace
+          sudo rsync --delete-before --force -r empty/ workspace/
+          sudo rm -rf empty workspace
 
   Firmware:
     needs: [Toolchain]
@@ -293,8 +293,8 @@ jobs:
           sudo umount $OPENWRT_ROOT_PATH || true
           sudo umount workspace/openwrt-ro || true
           mkdir empty
-          rsync --delete-before --force -r empty/ workspace/
-          rm -rf empty workspace
+          sudo rsync --delete-before --force -r empty/ workspace/
+          sudo rm -rf empty workspace
 
   Extra-Packages:
     needs: [Toolchain, Firmware]
@@ -376,8 +376,8 @@ jobs:
           sudo umount $OPENWRT_ROOT_PATH || true
           sudo umount workspace/openwrt-ro || true
           mkdir empty
-          rsync --delete-before --force -r empty/ workspace/
-          rm -rf empty workspace
+          sudo rsync --delete-before --force -r empty/ workspace/
+          sudo rm -rf empty workspace
 
   Upload:
     needs: [Toolchain, Firmware, Extra-Packages]

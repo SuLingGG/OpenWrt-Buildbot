@@ -336,8 +336,7 @@ jobs:
       - name: Clean Build Cache
         run: |
           cd $OPENWRT_ROOT_PATH
-          make target/clean
-          make package/libs/mbedtls/clean
+          make clean
 
       - name: Import Build Keys
         env:

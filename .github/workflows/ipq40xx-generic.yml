@@ -92,7 +92,7 @@ jobs:
           export DEVICE_TARGET=$(cat .config | grep CONFIG_TARGET_BOARD | awk -F '"' '{print $2}')
           echo "DEVICE_TARGET=$DEVICE_TARGET" >> $GITHUB_ENV
           echo "::set-output name=DEVICE_TARGET::$(echo $DEVICE_TARGET)"
-          export DEVICE_SUBTARGET=$(cat .config | grep CONFIG_TARGET_DEVICE_SUBTARGET | awk -F '"' '{print $2}')
+          export DEVICE_SUBTARGET=$(cat .config | grep CONFIG_TARGET_SUBTARGET | awk -F '"' '{print $2}')
           echo "DEVICE_SUBTARGET=$DEVICE_SUBTARGET" >> $GITHUB_ENV
           echo "::set-output name=DEVICE_SUBTARGET::$(echo $DEVICE_SUBTARGET)"
           export DEVICE_PLATFORM=$(cat .config | grep CONFIG_TARGET_ARCH_PACKAGES | awk -F '"' '{print $2}')

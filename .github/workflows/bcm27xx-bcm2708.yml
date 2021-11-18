@@ -23,6 +23,7 @@ env:
   WEB_ROOT_PATH: /data/dnmp/www/openwrt.cc
   TOOLCHAIN_TAG: toolchain
   FIRMWARE_RELEASE_UPLOAD: true
+  CLASH_BINARY_PLATFORM: armv6
   TZ: Asia/Shanghai
 
 jobs:
@@ -221,7 +222,7 @@ jobs:
           chmod +x $GITHUB_WORKSPACE/scripts/*.sh
           cd $OPENWRT_ROOT_PATH
           $GITHUB_WORKSPACE/$DIY_SH
-          $GITHUB_WORKSPACE/scripts/preset-clash-core.sh armv6
+          $GITHUB_WORKSPACE/scripts/preset-clash-core.sh $CLASH_BINARY_PLATFORM
           $GITHUB_WORKSPACE/scripts/preset-terminal-tools.sh
           make defconfig
 

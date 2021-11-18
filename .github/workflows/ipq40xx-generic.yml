@@ -34,7 +34,7 @@ jobs:
       CURRENT_BRANCH: ${{ steps.env.outputs.CURRENT_BRANCH }}
       SOURCE_OWNER: ${{ steps.env.outputs.SOURCE_OWNER }}
       SOURCE_REPO: ${{ steps.env.outputs.SOURCE_REPO }}
-      PLATFORM: ${{ steps.env.outputs.PLATFORM }}
+      CPU_PLATFORM: ${{ steps.env.outputs.CPU_PLATFORM }}
       TARGET: ${{ steps.env.outputs.TARGET }}
       SUBTARGET: ${{ steps.env.outputs.SUBTARGET }}
       TOOLCHAIN_IMAGE: ${{ steps.env.outputs.TOOLCHAIN_IMAGE }}
@@ -95,9 +95,9 @@ jobs:
           export SUBTARGET=$(cat .config | grep CONFIG_TARGET_SUBTARGET | awk -F '"' '{print $2}')
           echo "SUBTARGET=$SUBTARGET" >> $GITHUB_ENV
           echo "::set-output name=SUBTARGET::$(echo $SUBTARGET)"
-          export PLATFORM=$(cat .config | grep CONFIG_TARGET_ARCH_PACKAGES | awk -F '"' '{print $2}')
-          echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
-          echo "::set-output name=PLATFORM::$(echo $PLATFORM)"
+          export CPU_PLATFORM=$(cat .config | grep CONFIG_TARGET_ARCH_PACKAGES | awk -F '"' '{print $2}')
+          echo "CPU_PLATFORM=$CPU_PLATFORM" >> $GITHUB_ENV
+          echo "::set-output name=CPU_PLATFORM::$(echo $CPU_PLATFORM)"
           export TOOLCHAIN_IMAGE="toolchain-$SOURCE_OWNER-$SOURCE_REPO-$SOURCE_BRANCH-$TARGET-$SUBTARGET"
           echo "TOOLCHAIN_IMAGE=$TOOLCHAIN_IMAGE" >> $GITHUB_ENV
           echo "::set-output name=TOOLCHAIN_IMAGE::$(echo $TOOLCHAIN_IMAGE)"
@@ -179,7 +179,7 @@ jobs:
           echo "CURRENT_BRANCH=$(echo '${{needs.Toolchain.outputs.CURRENT_BRANCH}}')" >> $GITHUB_ENV
           echo "SOURCE_OWNER=$(echo '${{needs.Toolchain.outputs.SOURCE_OWNER}}')" >> $GITHUB_ENV
           echo "SOURCE_REPO=$(echo '${{needs.Toolchain.outputs.SOURCE_REPO}}')" >> $GITHUB_ENV
-          echo "PLATFORM=$(echo '${{needs.Toolchain.outputs.PLATFORM}}')" >> $GITHUB_ENV
+          echo "CPU_PLATFORM=$(echo '${{needs.Toolchain.outputs.CPU_PLATFORM}}')" >> $GITHUB_ENV
           echo "TARGET=$(echo '${{needs.Toolchain.outputs.TARGET}}')" >> $GITHUB_ENV
           echo "SUBTARGET=$(echo '${{needs.Toolchain.outputs.SUBTARGET}}')" >> $GITHUB_ENV
           echo "TOOLCHAIN_IMAGE=$(echo '${{needs.Toolchain.outputs.TOOLCHAIN_IMAGE}}')" >> $GITHUB_ENV
@@ -250,9 +250,9 @@ jobs:
       - name: Generate Firmware
         run: |
           cd data/opkg
-          sed -i "s/subtarget/$SUBTARGET/g" distfeeds.conf
-          sed -i "s/target\//$TARGET\//g" distfeeds.conf
-          sed -i "s/platform/$PLATFORM/g" distfeeds.conf
+          sed -i "s/SUBTARGET/$SUBTARGET/g" distfeeds.conf
+          sed -i "s/TARGET\//$TARGET\//g" distfeeds.conf
+          sed -i "s/CPU_PLATFORM/$CPU_PLATFORM/g" distfeeds.conf
           cd $OPENWRT_ROOT_PATH
           echo "dtparam=i2c_arm=on,audio=on" >> target/linux/bcm27xx/image/config.txt
           mkdir -p files/etc/uci-defaults/
@@ -315,7 +315,7 @@ jobs:
           echo "CURRENT_BRANCH=$(echo '${{needs.Toolchain.outputs.CURRENT_BRANCH}}')" >> $GITHUB_ENV
           echo "SOURCE_OWNER=$(echo '${{needs.Toolchain.outputs.SOURCE_OWNER}}')" >> $GITHUB_ENV
           echo "SOURCE_REPO=$(echo '${{needs.Toolchain.outputs.SOURCE_REPO}}')" >> $GITHUB_ENV
-          echo "PLATFORM=$(echo '${{needs.Toolchain.outputs.PLATFORM}}')" >> $GITHUB_ENV
+          echo "CPU_PLATFORM=$(echo '${{needs.Toolchain.outputs.CPU_PLATFORM}}')" >> $GITHUB_ENV
           echo "TARGET=$(echo '${{needs.Toolchain.outputs.TARGET}}')" >> $GITHUB_ENV
           echo "SUBTARGET=$(echo '${{needs.Toolchain.outputs.SUBTARGET}}')" >> $GITHUB_ENV
           echo "TOOLCHAIN_IMAGE=$(echo '${{needs.Toolchain.outputs.TOOLCHAIN_IMAGE}}')" >> $GITHUB_ENV
@@ -337,9 +337,9 @@ jobs:
         env:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
           SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
-          SOURCE_PACKAGES: "${{ env.OPENWRT_ROOT_PATH }}/bin/packages/${{ env.PLATFORM }}/"
+          SOURCE_PACKAGES: "${{ env.OPENWRT_ROOT_PATH }}/bin/packages/${{ env.CPU_PLATFORM }}/"
           DEST_TARGETS: "${{ env.WEB_ROOT_PATH }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
-          DEST_PACKAGES: "${{ env.WEB_ROOT_PATH }}/snapshots/packages/${{ env.PLATFORM }}/"
+          DEST_PACKAGES: "${{ env.WEB_ROOT_PATH }}/snapshots/packages/${{ env.CPU_PLATFORM }}/"
           REMOTE_PRIVATEKEY: "${{ secrets.HOSTHATCH_PRIVATEKEY }}"
         if: env.REMOTE_PRIVATEKEY != null
         run: |
@@ -349,16 +349,16 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
           bash -c "'mkdir -p $WEB_ROOT_PATH/snapshots/targets/$TARGET/$SUBTARGET \
-          $WEB_ROOT_PATH/snapshots/packages/$PLATFORM'"
+          $WEB_ROOT_PATH/snapshots/packages/$CPU_PLATFORM'"
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
 
       - name: Deploy Files To PacificRack Node
         env:
           HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.PACIFICRACK_IP }}"
           SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
-          SOURCE_PACKAGES: "${{ env.OPENWRT_ROOT_PATH }}/bin/packages/${{ env.PLATFORM }}/"
+          SOURCE_PACKAGES: "${{ env.OPENWRT_ROOT_PATH }}/bin/packages/${{ env.CPU_PLATFORM }}/"
           DEST_TARGETS: "${{ env.WEB_ROOT_PATH }}/snapshots/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/"
-          DEST_PACKAGES: "${{ env.WEB_ROOT_PATH }}/snapshots/packages/${{ env.PLATFORM }}/"
+          DEST_PACKAGES: "${{ env.WEB_ROOT_PATH }}/snapshots/packages/${{ env.CPU_PLATFORM }}/"
           REMOTE_PRIVATEKEY: "${{ secrets.PACIFICRACK_PRIVATEKEY }}"
         if: env.REMOTE_PRIVATEKEY != null
         run: |
@@ -368,7 +368,7 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
           bash -c "'mkdir -p $WEB_ROOT_PATH/snapshots/targets/$TARGET/$SUBTARGET \
-          $WEB_ROOT_PATH/snapshots/packages/$PLATFORM'"
+          $WEB_ROOT_PATH/snapshots/packages/$CPU_PLATFORM'"
           rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
 
       - name: Organize Files

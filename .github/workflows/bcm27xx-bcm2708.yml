@@ -229,6 +229,7 @@ jobs:
       - name: Install Feeds
         run: |
           cd $OPENWRT_ROOT_PATH
+          ./scripts/feeds clean
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 

@@ -214,17 +214,6 @@ jobs:
           mkdir -p files/etc/opkg/keys
           cp key-build.pub files/etc/opkg/keys/$PUBLICKEY_FINGERPRINT
 
-      - name: Load Custom Configuration
-        run: |
-          [ -e files ] && mv files $OPENWRT_ROOT_PATH/files
-          [ -e $CONFIG_FILE ] && cp $CONFIG_FILE $OPENWRT_ROOT_PATH/.config
-          cat config/firmware-extra.config >> $OPENWRT_ROOT_PATH/.config
-          chmod +x $GITHUB_WORKSPACE/scripts/*.sh
-          cd $OPENWRT_ROOT_PATH
-          $GITHUB_WORKSPACE/$DIY_SH
-          $GITHUB_WORKSPACE/scripts/preset-clash-core.sh $CLASH_BINARY_PLATFORM
-          $GITHUB_WORKSPACE/scripts/preset-terminal-tools.sh
-
       - name: Install Feeds
         run: |
           cd $OPENWRT_ROOT_PATH
@@ -232,19 +221,29 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
+      - name: Load Custom Configuration
+        run: |
+          [ -e files ] && mv files $OPENWRT_ROOT_PATH/files
+          [ -e $CONFIG_FILE ] && cp $GITHUB_WORKSPACE/$CONFIG_FILE $OPENWRT_ROOT_PATH/.config
+          cat $GITHUB_WORKSPACE/config/firmware-extra.config >> $OPENWRT_ROOT_PATH/.config
+          cd $OPENWRT_ROOT_PATH
+          make defconfig
+          chmod +x $GITHUB_WORKSPACE/scripts/*.sh
+          $GITHUB_WORKSPACE/$DIY_SH
+          $GITHUB_WORKSPACE/scripts/preset-clash-core.sh $CLASH_BINARY_PLATFORM
+          $GITHUB_WORKSPACE/scripts/preset-terminal-tools.sh
+
       - name: Download DL Package
         run: |
           cd $OPENWRT_ROOT_PATH
           rm -rf dl
           cp -rf /data/cache/dl .
-          make defconfig
           make download -j64
 
       - name: Compile Packages
         run: |
           cd $OPENWRT_ROOT_PATH
           echo -e "$(nproc) thread compile"
-          make buildinfo
           make diffconfig buildversion feedsversion
           make target/compile -j$(nproc) 'IGNORE_ERRORS=n m' BUILD_LOG=1 || make target/compile -j1 V=s IGNORE_ERRORS=1
           make package/compile -j$(nproc) 'IGNORE_ERRORS=n m' BUILD_LOG=1 || make package/compile -j1 V=s

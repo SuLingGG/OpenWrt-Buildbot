@@ -232,13 +232,29 @@ jobs:
           $GITHUB_WORKSPACE/scripts/preset-terminal-tools.sh
           cat $OPENWRT_ROOT_PATH/.config
 
-      - name: Upload Job Logs
-        if: always()
-        uses: actions/upload-artifact@main
-        with:
-          name: Logs-${{ github.job }}
-          path: ${{ env.OPENWRT_ROOT_PATH }}/logs
-          if-no-files-found: ignore
+      - name: Install Feeds
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          ./scripts/feeds clean
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Download DL Package
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          rm -rf dl
+          cp -rf /data/cache/dl .
+          make defconfig
+          cat .config
+
+      - name: Compile Packages
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          echo -e "$(nproc) thread compile"
+          make buildinfo
+          cat .config
+          make diffconfig buildversion feedsversion
+          cat .config
 
       - name: Collect Workflows Logs
         run: |

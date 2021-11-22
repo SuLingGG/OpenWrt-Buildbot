@@ -29,6 +29,9 @@ git clone --depth=1 https://github.com/garypang13/smartdns-le
 # Add luci-app-godproxy
 git clone --depth=1 https://github.com/project-lede/luci-app-godproxy
 
+# Add luci-app-jd-dailybonus
+git clone --depth=1 https://github.com/jerrykuku/luci-app-jd-dailybonus
+
 # Add luci-app-modeminfo
 git clone --depth=1 https://github.com/koshev-msk/luci-app-modeminfo
 
@@ -37,11 +40,6 @@ git clone --depth=1 https://github.com/KFERMercer/luci-app-tcpdump
 
 # Add luci-app-oaf
 git clone --depth=1 https://github.com/destan19/OpenAppFilter -b oaf-3.0.1
-
-# Add luci-udptools
-svn co https://github.com/zcy85611/Openwrt-Package/trunk/luci-udptools
-svn co https://github.com/zcy85611/Openwrt-Package/trunk/udp2raw
-svn co https://github.com/zcy85611/Openwrt-Package/trunk/udpspeeder-tunnel
 
 # Add luci-theme-argon_armygreen
 git clone --depth=1 https://github.com/XXKDB/luci-theme-argon_armygreen

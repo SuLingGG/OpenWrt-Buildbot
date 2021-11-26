@@ -72,8 +72,7 @@ jobs:
       - name: Generate Toolchain Config
         run: |
           [ -e $CONFIG_FILE ] && cp $CONFIG_FILE $OPENWRT_ROOT_PATH/.config
-          echo -e "\nCONFIG_ALL=y" >> $OPENWRT_ROOT_PATH/.config
-          echo -e "\nCONFIG_ALL_NONSHARED=y" >> $OPENWRT_ROOT_PATH/.config
+          echo -e "\nCONFIG_ALL=y\nCONFIG_ALL_NONSHARED=y\nCONFIG_DEVEL=y\nCONFIG_CCACHE=y" >> $OPENWRT_ROOT_PATH/.config
           cd $OPENWRT_ROOT_PATH
           make defconfig > /dev/null 2>&1
 

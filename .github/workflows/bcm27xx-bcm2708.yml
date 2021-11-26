@@ -363,7 +363,7 @@ jobs:
           cat $OPENWRT_ROOT_PATH/logs/package/error.txt
           cat $OPENWRT_ROOT_PATH/logs/package/error.txt | awk '{print $2}' | awk -F '/' '{print $(NF)}' | \
             sed 's/^/CONFIG_PACKAGE_&/g' | sed 's/$/&=y/g' > $OPENWRT_ROOT_PATH/failed-packages.config
-          mkdir -p output/logs
+          mkdir -p output/logs/${{ github.job }}
           mv $OPENWRT_ROOT_PATH/logs output/logs/${{ github.job }}/ccache
 
       - name: Compile Failed Packages Without Ccache
@@ -390,7 +390,7 @@ jobs:
       - name: Collect Workflows Logs Without Ccache
         run: |
           cat $OPENWRT_ROOT_PATH/logs/package/error.txt
-          mkdir -p output/logs
+          mkdir -p output/logs/${{ github.job }}
           mv $OPENWRT_ROOT_PATH/logs output/logs/${{ github.job }}/noccache
           mv output/logs output/bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET
 
@@ -415,88 +415,88 @@ jobs:
           sudo rsync --delete-before --force -r empty/ workspace/
           sudo rm -rf empty workspace
 
-  Upload:
-    needs: [Toolchain, Firmware, Extra-Packages]
-    runs-on: ubuntu-20.04
+  # Upload:
+  #   needs: [Toolchain, Firmware, Extra-Packages]
+  #   runs-on: ubuntu-20.04
 
-    steps:
-      - name: Restore Variables
-        run: |
-          sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-          echo "CURRENT_BRANCH=$(echo '${{needs.Toolchain.outputs.CURRENT_BRANCH}}')" >> $GITHUB_ENV
-          echo "SOURCE_OWNER=$(echo '${{needs.Toolchain.outputs.SOURCE_OWNER}}')" >> $GITHUB_ENV
-          echo "SOURCE_REPO=$(echo '${{needs.Toolchain.outputs.SOURCE_REPO}}')" >> $GITHUB_ENV
-          echo "DEVICE_PLATFORM=$(echo '${{needs.Toolchain.outputs.DEVICE_PLATFORM}}')" >> $GITHUB_ENV
-          echo "DEVICE_TARGET=$(echo '${{needs.Toolchain.outputs.DEVICE_TARGET}}')" >> $GITHUB_ENV
-          echo "DEVICE_SUBTARGET=$(echo '${{needs.Toolchain.outputs.DEVICE_SUBTARGET}}')" >> $GITHUB_ENV
-          echo "TOOLCHAIN_IMAGE=$(echo '${{needs.Toolchain.outputs.TOOLCHAIN_IMAGE}}')" >> $GITHUB_ENV
+  #   steps:
+  #     - name: Restore Variables
+  #       run: |
+  #         sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+  #         echo "CURRENT_BRANCH=$(echo '${{needs.Toolchain.outputs.CURRENT_BRANCH}}')" >> $GITHUB_ENV
+  #         echo "SOURCE_OWNER=$(echo '${{needs.Toolchain.outputs.SOURCE_OWNER}}')" >> $GITHUB_ENV
+  #         echo "SOURCE_REPO=$(echo '${{needs.Toolchain.outputs.SOURCE_REPO}}')" >> $GITHUB_ENV
+  #         echo "DEVICE_PLATFORM=$(echo '${{needs.Toolchain.outputs.DEVICE_PLATFORM}}')" >> $GITHUB_ENV
+  #         echo "DEVICE_TARGET=$(echo '${{needs.Toolchain.outputs.DEVICE_TARGET}}')" >> $GITHUB_ENV
+  #         echo "DEVICE_SUBTARGET=$(echo '${{needs.Toolchain.outputs.DEVICE_SUBTARGET}}')" >> $GITHUB_ENV
+  #         echo "TOOLCHAIN_IMAGE=$(echo '${{needs.Toolchain.outputs.TOOLCHAIN_IMAGE}}')" >> $GITHUB_ENV
 
-      - name: Download Bin Archive
-        uses: actions/download-artifact@v2
-        with:
-          name: Bin-Archive
-          path: openwrt
+  #     - name: Download Bin Archive
+  #       uses: actions/download-artifact@v2
+  #       with:
+  #         name: Bin-Archive
+  #         path: openwrt
 
-      - name: Decompress Bin Archive
-        run: |
-          cd openwrt
-          echo "OPENWRT_ROOT_PATH=$PWD" >> $GITHUB_ENV
-          zip -qs 0 bin-archive.zip --out $DEVICE_TARGET-$DEVICE_SUBTARGET.zip
-          unzip $DEVICE_TARGET-$DEVICE_SUBTARGET.zip
+  #     - name: Decompress Bin Archive
+  #       run: |
+  #         cd openwrt
+  #         echo "OPENWRT_ROOT_PATH=$PWD" >> $GITHUB_ENV
+  #         zip -qs 0 bin-archive.zip --out $DEVICE_TARGET-$DEVICE_SUBTARGET.zip
+  #         unzip $DEVICE_TARGET-$DEVICE_SUBTARGET.zip
 
-      - name: Deploy Files To HostHatch Node
-        env:
-          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
-          SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/"
-          SOURCE_PACKAGES: "${{ env.OPENWRT_ROOT_PATH }}/bin/packages/${{ env.DEVICE_PLATFORM }}/"
-          DEST_TARGETS: "${{ env.WEB_ROOT_PATH }}/snapshots/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/"
-          DEST_PACKAGES: "${{ env.WEB_ROOT_PATH }}/snapshots/packages/${{ env.DEVICE_PLATFORM }}/"
-          REMOTE_PRIVATEKEY: "${{ secrets.HOSTHATCH_PRIVATEKEY }}"
-        if: env.REMOTE_PRIVATEKEY != null
-        run: |
-          mkdir -p ~/.ssh/
-          install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{ secrets.HOSTHATCH_PRIVATEKEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $WEB_ROOT_PATH/snapshots/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET \
-          $WEB_ROOT_PATH/snapshots/packages/$DEVICE_PLATFORM'"
-          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
-          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
+  #     - name: Deploy Files To HostHatch Node
+  #       env:
+  #         HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.HOSTHATCH_IP }}"
+  #         SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/"
+  #         SOURCE_PACKAGES: "${{ env.OPENWRT_ROOT_PATH }}/bin/packages/${{ env.DEVICE_PLATFORM }}/"
+  #         DEST_TARGETS: "${{ env.WEB_ROOT_PATH }}/snapshots/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/"
+  #         DEST_PACKAGES: "${{ env.WEB_ROOT_PATH }}/snapshots/packages/${{ env.DEVICE_PLATFORM }}/"
+  #         REMOTE_PRIVATEKEY: "${{ secrets.HOSTHATCH_PRIVATEKEY }}"
+  #       if: env.REMOTE_PRIVATEKEY != null
+  #       run: |
+  #         mkdir -p ~/.ssh/
+  #         install -m 600 /dev/null ~/.ssh/id_rsa
+  #         echo "${{ secrets.HOSTHATCH_PRIVATEKEY }}" > ~/.ssh/id_rsa
+  #         chmod 600 ~/.ssh/id_rsa
+  #         ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
+  #         bash -c "'mkdir -p $WEB_ROOT_PATH/snapshots/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET \
+  #         $WEB_ROOT_PATH/snapshots/packages/$DEVICE_PLATFORM'"
+  #         rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
+  #         rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
 
-      - name: Deploy Files To PacificRack Node
-        env:
-          HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.PACIFICRACK_IP }}"
-          SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/"
-          SOURCE_PACKAGES: "${{ env.OPENWRT_ROOT_PATH }}/bin/packages/${{ env.DEVICE_PLATFORM }}/"
-          DEST_TARGETS: "${{ env.WEB_ROOT_PATH }}/snapshots/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/"
-          DEST_PACKAGES: "${{ env.WEB_ROOT_PATH }}/snapshots/packages/${{ env.DEVICE_PLATFORM }}/"
-          REMOTE_PRIVATEKEY: "${{ secrets.PACIFICRACK_PRIVATEKEY }}"
-        if: env.REMOTE_PRIVATEKEY != null
-        run: |
-          mkdir -p ~/.ssh/
-          install -m 600 /dev/null ~/.ssh/id_rsa
-          echo "${{ secrets.PACIFICRACK_PRIVATEKEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
-          bash -c "'mkdir -p $WEB_ROOT_PATH/snapshots/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET \
-          $WEB_ROOT_PATH/snapshots/packages/$DEVICE_PLATFORM'"
-          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
-          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
+  #     - name: Deploy Files To PacificRack Node
+  #       env:
+  #         HOST: "${{ secrets.REMOTE_USER }}@${{ secrets.PACIFICRACK_IP }}"
+  #         SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/"
+  #         SOURCE_PACKAGES: "${{ env.OPENWRT_ROOT_PATH }}/bin/packages/${{ env.DEVICE_PLATFORM }}/"
+  #         DEST_TARGETS: "${{ env.WEB_ROOT_PATH }}/snapshots/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/"
+  #         DEST_PACKAGES: "${{ env.WEB_ROOT_PATH }}/snapshots/packages/${{ env.DEVICE_PLATFORM }}/"
+  #         REMOTE_PRIVATEKEY: "${{ secrets.PACIFICRACK_PRIVATEKEY }}"
+  #       if: env.REMOTE_PRIVATEKEY != null
+  #       run: |
+  #         mkdir -p ~/.ssh/
+  #         install -m 600 /dev/null ~/.ssh/id_rsa
+  #         echo "${{ secrets.PACIFICRACK_PRIVATEKEY }}" > ~/.ssh/id_rsa
+  #         chmod 600 ~/.ssh/id_rsa
+  #         ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
+  #         bash -c "'mkdir -p $WEB_ROOT_PATH/snapshots/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET \
+  #         $WEB_ROOT_PATH/snapshots/packages/$DEVICE_PLATFORM'"
+  #         rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
+  #         rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
 
-      - name: Organize Files
-        run: |
-          cd $OPENWRT_ROOT_PATH/bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET
-          rm -rf packages logs
+  #     - name: Organize Files
+  #       run: |
+  #         cd $OPENWRT_ROOT_PATH/bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET
+  #         rm -rf packages logs
 
-      - name: Deploy Files To Release
-        uses: ncipollo/release-action@v1.8.0
-        if: env.FIRMWARE_RELEASE_UPLOAD == 'true'
-        with:
-          name: openwrt-${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}
-          allowUpdates: true
-          replacesArtifacts: true
-          tag: ${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}
-          commit: ${{ env.CURRENT_BRANCH }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          artifacts: ${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/*
+  #     - name: Deploy Files To Release
+  #       uses: ncipollo/release-action@v1.8.0
+  #       if: env.FIRMWARE_RELEASE_UPLOAD == 'true'
+  #       with:
+  #         name: openwrt-${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}
+  #         allowUpdates: true
+  #         replacesArtifacts: true
+  #         tag: ${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}
+  #         commit: ${{ env.CURRENT_BRANCH }}
+  #         token: ${{ secrets.GITHUB_TOKEN }}
+  #         artifacts: ${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/*

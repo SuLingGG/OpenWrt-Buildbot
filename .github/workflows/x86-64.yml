@@ -174,9 +174,6 @@ jobs:
     needs: [Toolchain]
     runs-on: project-x86_64
 
-    outputs:
-      WORKSPACE_LOOP_DEVNAME: ${{ steps.init.outputs.WORKSPACE_LOOP_DEVNAME }}
-
     steps:
       - name: Restore Variables
         run: |
@@ -332,31 +329,72 @@ jobs:
           mkdir -p files/etc/opkg/keys
           cp key-build.pub files/etc/opkg/keys/$PUBLICKEY_FINGERPRINT
 
-      - name: Compile Extra Packages
+      - name: Enable Ccache
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          export CCACHE_FILE_PATH="/data/ccache/ccache-$SOURCE_OWNER-$SOURCE_REPO-$SOURCE_BRANCH-$DEVICE_TARGET-$DEVICE_SUBTARGET"
+          echo "CCACHE_FILE_PATH=$CCACHE_FILE_PATH" >> $GITHUB_ENV
+          mkdir -p $CCACHE_FILE_PATH
+          grep -sq max_size "$CCACHE_FILE_PATH/ccache.conf" || \
+            echo "max_size = 20.0G" >> "$CCACHE_FILE_PATH/ccache.conf" || true
+          grep -sq compiler_check "$HOME/.ccache/ccache.conf" || \
+            echo "compiler_check = %compiler% -dumpmachine; %compiler% -dumpversion" >> "$CCACHE_FILE_PATH/ccache.conf" || true
+          rm -f .config
+          cp $GITHUB_WORKSPACE/$CONFIG_FILE .config
+          echo -e "\nCONFIG_DEVEL=y\nCONFIG_CCACHE=y\nCONFIG_CCACHE_DIR=\"$CCACHE_FILE_PATH\"" >> $OPENWRT_ROOT_PATH/.config
+          cat $GITHUB_WORKSPACE/config/packages-extra.config >> $OPENWRT_ROOT_PATH/.config
+          make defconfig
+          CCACHE_DIR=$CCACHE_FILE_PATH staging_dir/host/bin/ccache -sv
+
+      - name: Compile Extra Packages With Ccache
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          make target/compile -j$(nproc) IGNORE_ERRORS="m n" BUILD_LOG=1
+          make package/compile -j$(nproc) BUILD_LOG=1 IGNORE_ERRORS="y m n"
+
+      - name: Upload Job Logs With Ccache
+        if: always()
+        uses: actions/upload-artifact@main
+        with:
+          name: Logs-${{ github.job }}-Ccache
+          path: ${{ env.OPENWRT_ROOT_PATH }}/logs
+          if-no-files-found: ignore
+
+      - name: Collect Workflows Logs With Ccache
+        run: |
+          cat $OPENWRT_ROOT_PATH/logs/package/error.txt
+          cat $OPENWRT_ROOT_PATH/logs/package/error.txt | awk '{print $2}' | awk -F '/' '{print $(NF)}' | \
+            sed 's/^/CONFIG_PACKAGE_&/g' | sed 's/$/&=m/g' > $OPENWRT_ROOT_PATH/failed-packages.config
+          mkdir -p output/logs/${{ github.job }}
+          mv $OPENWRT_ROOT_PATH/logs output/logs/${{ github.job }}/ccache
+          CCACHE_DIR=$CCACHE_FILE_PATH staging_dir/host/bin/ccache -sv
+
+      - name: Compile Failed Packages Without Ccache
         run: |
           cd $OPENWRT_ROOT_PATH
           rm -f .config
           cp $GITHUB_WORKSPACE/$CONFIG_FILE .config
-          cat $GITHUB_WORKSPACE/config/packages-extra.config >> $OPENWRT_ROOT_PATH/.config
+          cat $OPENWRT_ROOT_PATH/failed-packages.config >> $OPENWRT_ROOT_PATH/.config
           make defconfig
-          make target/compile -j$(nproc) IGNORE_ERRORS="m n" BUILD_LOG=1 || make target/compile -j1 V=s IGNORE_ERRORS="m n"
-          make package/compile -j$(nproc) BUILD_LOG=1 IGNORE_ERRORS="y m n" || make package/compile -j1 V=s IGNORE_ERRORS="y m n"
+          make package/cleanup
+          make package/compile -j$(nproc) BUILD_LOG=1 IGNORE_ERRORS="y m n"
           make package/index
           mkdir -p $GITHUB_WORKSPACE/output/bin/packages
           mv bin/packages/$DEVICE_PLATFORM $GITHUB_WORKSPACE/output/bin/packages
 
-      - name: Upload Job Logs
+      - name: Upload Job Logs Without Ccache
         if: always()
         uses: actions/upload-artifact@main
         with:
-          name: Logs-${{ github.job }}
+          name: Logs-${{ github.job }}-NoCcache
           path: ${{ env.OPENWRT_ROOT_PATH }}/logs
           if-no-files-found: ignore
 
-      - name: Collect Workflows Logs
+      - name: Collect Workflows Logs Without Ccache
         run: |
-          mkdir -p output/logs
-          mv $OPENWRT_ROOT_PATH/logs output/logs/${{ github.job }}
+          cat $OPENWRT_ROOT_PATH/logs/package/error.txt
+          mkdir -p output/logs/${{ github.job }}
+          mv $OPENWRT_ROOT_PATH/logs output/logs/${{ github.job }}/noccache
           mv output/logs output/bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET
 
       - name: Compress Bin Folder

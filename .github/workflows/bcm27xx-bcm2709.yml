@@ -11,7 +11,7 @@ name: Build bcm27xx/bcm2709 openwrt
 on:
   workflow_dispatch:
   schedule:
-    - cron: 0 20 * * 1,3,5
+    - cron: 0 6 * * 0,1,3,5
   # watch:
   #   types: started
 

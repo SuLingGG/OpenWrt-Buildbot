@@ -11,7 +11,7 @@ name: Build sunxi/cortexa53 openwrt
 on:
   workflow_dispatch:
   schedule:
-    - cron: 0 16 * * 2,4,6
+    - cron: 0 10 * * 2,4,6
   # watch:
   #   types: started
 

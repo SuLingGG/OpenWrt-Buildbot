@@ -16,3 +16,13 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           retain_days: 7
+          
+      - name: Delete Old Toolchain Assets
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        uses: mknejp/delete-release-assets@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: rockchip-armv8
+          fail-if-no-assets: false
+          fail-if-no-release: false
+          assets: "*"

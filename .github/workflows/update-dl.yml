@@ -1,0 +1,151 @@
+#=================================================
+# https://github.com/P3TERX/Actions-OpenWrt
+# Description: Build OpenWrt using GitHub Actions
+# Lisence: MIT
+# Author: P3TERX
+# Blog: https://p3terx.com
+#=================================================
+
+name: Update DL Mirror
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: 0 18 * * *
+
+env:
+  WEBROOT: /data/www/openwrt.cc
+
+jobs:
+  Download:
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        REPO: [openwrt/openwrt, coolsnowwolf/lede, immortalwrt/immortalwrt, lienol/openwrt]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Initialization Environment
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo -E rm -rf /etc/apt/sources.list.d/*
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq install rdfind $(curl -fsSL git.io/depends-ubuntu-2004)
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -y purge azure* dotnet* firefox ghc* google* hhvm llvm* mono* mysql* openjdk* php* zulu* powershell* msodbc*
+          sudo -E apt-get -qq clean
+          sudo -E rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /etc/mysql /etc/php /usr/local/share/boost
+          sudo -E snap set system refresh.retain=2
+          sudo -E docker image prune -a -f
+          sudo -E ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+
+      - name: Combine Disks
+        run: |
+          sudo swapoff -a
+          sudo rm -f /mnt/swapfile
+          export ROOT_FREE_KB=$(df --block-size=1024 --output=avail / | tail -1)
+          export ROOT_LOOP_KB=$(expr $ROOT_FREE_KB - 1048576)
+          export ROOT_LOOP_BYTES=$(expr $ROOT_LOOP_KB \* 1024)
+          sudo fallocate -l $ROOT_LOOP_BYTES /root.img
+          export ROOT_LOOP_DEVNAME=$(sudo losetup -Pf --show /root.img)
+          sudo pvcreate -f $ROOT_LOOP_DEVNAME
+          export MNT_FREE_KB=$(df --block-size=1024 --output=avail /mnt | tail -1)
+          export MNT_LOOP_KB=$(expr $MNT_FREE_KB - 102400)
+          export MNT_LOOP_BYTES=$(expr $MNT_LOOP_KB \* 1024)
+          sudo fallocate -l $MNT_LOOP_BYTES /mnt/mnt.img
+          export MNT_LOOP_DEVNAME=$(sudo losetup -Pf --show /mnt/mnt.img)
+          sudo pvcreate -f $MNT_LOOP_DEVNAME
+          sudo vgcreate vgstorage $ROOT_LOOP_DEVNAME $MNT_LOOP_DEVNAME
+          sudo lvcreate -n lvstorage -l 100%FREE vgstorage
+          export LV_DEVNAME=$(sudo lvscan | awk -F "'" '{print $2}')
+          sudo mkfs.btrfs -L combinedisk $LV_DEVNAME
+          sudo mount -o compress=zstd $LV_DEVNAME $GITHUB_WORKSPACE
+          sudo chown -R runner:runner $GITHUB_WORKSPACE
+          mkdir -p $GITHUB_WORKSPACE/tmp
+          chmod 777 $GITHUB_WORKSPACE/tmp
+          sudo cp -rp /tmp/* $GITHUB_WORKSPACE/tmp
+          sudo mount -B $GITHUB_WORKSPACE/tmp /tmp
+
+      - name: Print Disk Usage Information
+        run: |
+          sudo btrfs filesystem usage $GITHUB_WORKSPACE
+
+      - name: Download All Packages
+        env:
+          REPO: ${{ matrix.REPO }}
+        run: |
+          export REPO_USER="$(echo $REPO | awk -F '/' '{print $1}')"
+          echo "REPO_USER=$REPO_USER" >> $GITHUB_ENV
+          export REPO_NAME="$(echo $REPO | awk -F '/' '{print $2}')"
+          echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
+
+          export OPENWRT_BRANCH="master openwrt-18.06 openwrt-19.07 openwrt-21.02 lede-17.01"
+          export IMMORTALWRT_BRANCH="master openwrt-18.06 openwrt-18.06-dev openwrt-18.06-k5.4 openwrt-21.02"
+          export COOLSNOWWOLF_BRANCH="master"
+          export LIENOL_BRANCH="main 19.07"
+
+          if [ $REPO_USER == openwrt ]
+          then
+            export BRANCH=$OPENWRT_BRANCH
+          elif [ $REPO_USER == immortalwrt ]
+          then
+            export BRANCH=$IMMORTALWRT_BRANCH
+          elif [ $REPO_USER == coolsnowwolf ]
+          then
+            export BRANCH=$COOLSNOWWOLF_BRANCH
+          else
+            export BRANCH=$LIENOL_BRANCH
+          fi
+
+          for REPO_BRANCH in $BRANCH
+          do
+            git clone --depth=1 https://github.com/$REPO_USER/$REPO_NAME -b $REPO_BRANCH $REPO_BRANCH
+            pushd $REPO_BRANCH
+            ./scripts/feeds update -a && ./scripts/feeds install -a
+            echo "CONFIG_ALL=y" >> .config
+            make defconfig
+            make download -j32 IGNORE_ERRORS=1
+            find dl -size -1024c -exec ls -l {} \;
+            find dl -size -1024c -exec rm -f {} \;
+            mkdir -p ../output/$REPO_USER/$REPO_NAME
+            mv dl ../output/$REPO_USER/$REPO_NAME/$REPO_USER-$REPO_NAME-$REPO_BRANCH
+            popd
+          done
+
+          pushd output/$REPO_USER/$REPO_NAME
+          ls | xargs -i rsync -aqux --remove-source-files {}/ .
+          rm -rf $REPO_USER-*
+          popd
+          sudo rdfind -makehardlinks true output
+
+      - name: Deploy Files To Server
+        env:
+          HOST: "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}"
+          SOURCE_DL: "output/${{ env.REPO_USER }}/${{ env.REPO_NAME }}/"
+          DEST_DL: "${{ env.WEBROOT }}/dl/${{ env.REPO_USER }}/${{ env.REPO_NAME }}/"
+          SERVER_PRIVATEKEY: "${{ secrets.SERVER_PRIVATEKEY }}"
+        run: |
+          mkdir -p ~/.ssh/
+          install -m 600 /dev/null ~/.ssh/id_rsa
+          echo "${{ secrets.SERVER_PRIVATEKEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
+          bash -c "'mkdir -p $DEST_DL'"
+          rsync -chavHP --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" $SOURCE_DL $HOST:$DEST_DL
+
+      - name: Deploy Files To Backblaze
+        env:
+          B2_APPLICATION_KEY: "${{ secrets.B2_APPLICATION_KEY }}"
+          B2_APPLICATION_KEY_ID: "${{ secrets.B2_APPLICATION_KEY_ID }}"
+          SOURCE_DL: "output/${{ env.REPO_USER }}/${{ env.REPO_NAME }}/"
+          DEST_DL: "b2://${{ secrets.B2_BUCKETNAME }}/dl/${{ env.REPO_USER }}/${{ env.REPO_NAME }}/"
+        if: env.B2_APPLICATION_KEY != null && env.B2_APPLICATION_KEY_ID != null
+        run: |
+          sudo wget -q -O /bin/b2 https://github.com/Backblaze/B2_Command_Line_Tool/releases/latest/download/b2-linux
+          sudo chmod +x /bin/b2
+          b2 authorize-account $B2_APPLICATION_KEY_ID $B2_APPLICATION_KEY
+          b2 sync --noProgress --threads 32 --compareVersions size --delete --replaceNewer $SOURCE_DL $DEST_DL

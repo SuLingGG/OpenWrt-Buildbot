@@ -1,0 +1,255 @@
+#=================================================
+# https://github.com/P3TERX/Actions-OpenWrt
+# Description: Build OpenWrt using GitHub Actions
+# Lisence: MIT
+# Author: P3TERX
+# Blog: https://p3terx.com
+#=================================================
+
+name: Build Packages
+
+on:
+  repository_dispatch:
+    types: [packages]
+  workflow_dispatch:
+    inputs:
+      INPUT_TARGET:
+        description: "Target to build (platform/target/subtarget)"
+        required: false
+        default: "all"
+  schedule:
+    - cron: 0 20 * * 0,2,4
+
+env:
+  SOURCE_URL: https://github.com/immortalwrt/immortalwrt
+  SOURCE_BRANCH: openwrt-18.06-k5.4
+  CURRENT_BRANCH: main
+  WEB_ROOT_PATH: /data/www/openwrt.cc
+  TOOLCHAIN_TAG: toolchain
+  TZ: Asia/Shanghai
+
+jobs:
+  Config:
+    name: Generate Config
+    runs-on: ubuntu-latest
+    outputs:
+      TARGETS: ${{ steps.find-targets.outputs.TARGETS }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Find Targets
+        id: find-targets
+        env:
+          INPUT_TARGET: ${{ github.event.inputs.INPUT_TARGET }}
+        run: |
+          if [ "$INPUT_TARGET" = "all" ] || [ "$INPUT_TARGET" = "" ]; then
+            export TARGETS="$(cat $GITHUB_WORKSPACE/data/support/platform.config)"
+          else
+            export TARGETS="$INPUT_TARGET"
+          fi
+          JSON='{"config": ["default"], "targets":['
+          FIRST=1
+          for TARGET in $TARGETS; do
+          [[ $FIRST -ne 1 ]] && JSON="$JSON"','
+          JSON="$JSON"'"'"${TARGET}"'"'
+          FIRST=0
+          done
+          JSON="$JSON"']}'
+          echo $JSON
+          echo "::set-output name=TARGETS::$JSON"
+
+  Packages:
+    name: Packages ${{ matrix.TARGETS }}
+    needs: [Config]
+    runs-on: packages
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix: ${{fromJson(needs.Config.outputs.TARGETS)}}
+
+    steps:
+      - name: Clean Environment
+        run: |
+          sudo umount /dev/loop*p1 || true
+          sudo losetup -D || true
+          sudo umount overlay || true
+          sudo rm -rf workspace || true
+
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Generate Variables
+        id: env
+        run: |
+          export SOURCE_OWNER=$(echo $SOURCE_URL | awk -F '/' '{print $(NF-1)}')
+          echo "SOURCE_OWNER=$SOURCE_OWNER" >> $GITHUB_ENV
+          export SOURCE_REPO=$(echo $SOURCE_URL | awk -F '/' '{print $(NF)}')
+          echo "SOURCE_REPO=$SOURCE_REPO" >> $GITHUB_ENV
+          export DEVICE_PLATFORM=$(echo ${{ matrix.TARGETS }} | awk -F '/' '{print $1}')
+          echo "DEVICE_PLATFORM=$DEVICE_PLATFORM" >> $GITHUB_ENV
+          export DEVICE_TARGET=$(echo ${{ matrix.TARGETS }} | awk -F '/' '{print $2}')
+          echo "DEVICE_TARGET=$DEVICE_TARGET" >> $GITHUB_ENV
+          export DEVICE_SUBTARGET=$(echo ${{ matrix.TARGETS }} | awk -F '/' '{print $3}')
+          echo "DEVICE_SUBTARGET=$DEVICE_SUBTARGET" >> $GITHUB_ENV
+          export TARGET_INFO="$SOURCE_OWNER-$SOURCE_REPO-$SOURCE_BRANCH-$DEVICE_TARGET-$DEVICE_SUBTARGET"
+          echo "TARGET_INFO=$TARGET_INFO" >> $GITHUB_ENV
+
+      - name: Prepare Toolchain Image
+        run: |
+          mkdir -p workspace
+          cd workspace
+          for i in {0..9}
+          do
+            curl -fsL https://github.com/$GITHUB_REPOSITORY/releases/download/$TOOLCHAIN_TAG/toolchain-${TARGET_INFO}.img.0$i >> toolchain-${TARGET_INFO}.img || break
+          done
+          mkdir -p openwrt-ro openwrt workdir overlay
+          sudo mount -o loop toolchain-${TARGET_INFO}.img openwrt-ro
+          sudo mount -t overlay overlay -o lowerdir=openwrt-ro,upperdir=overlay,workdir=workdir openwrt
+          sudo chown runner:runner openwrt
+          cd openwrt
+          echo "OPENWRT_ROOT_PATH=$PWD" >> $GITHUB_ENV
+          git pull
+
+      - name: Import Build Keys
+        env:
+          BUILD_PRIVATEKEY: ${{ secrets.BUILD_PRIVATEKEY }}
+          BUILD_PUBLICKEY: ${{ secrets.BUILD_PUBLICKEY }}
+        if: env.BUILD_PRIVATEKEY != null && env.BUILD_PUBLICKEY != null
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          echo -e "$BUILD_PRIVATEKEY" > key-build
+          echo -e "$BUILD_PUBLICKEY" > key-build.pub
+          wc -c key-build key-build.pub
+
+      - name: Install Feeds
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Generate Config File
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          echo CONFIG_TARGET_${DEVICE_TARGET}=y > .config
+          echo CONFIG_TARGET_${DEVICE_TARGET}_${DEVICE_SUBTARGET}=y >> .config
+          cat $GITHUB_WORKSPACE/config/packages.config >> .config
+          echo -e "\n---- Original Config Start ----\n"
+          cat .config
+          echo -e "\n---- Original Config End ----\n"
+          make defconfig
+          echo -e "\n---- Whole Config Start ----\n"
+          cat .config
+          echo -e "\n---- Whole Config End ----\n"
+
+      - name: Download Source Packages
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          cp -rf /data/cache/dl .
+          make download -j64
+
+      - name: Compile Kmods
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          make target/compile -j$(nproc) IGNORE_ERRORS="m n" BUILD_LOG=1 || \
+            yes n | make target/compile -j1 V=s IGNORE_ERRORS=1
+
+      - name: Compile Packages
+        timeout-minutes: 240
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          make package/compile -j$(nproc) IGNORE_ERRORS="y m n" BUILD_LOG=1
+
+      - name: Generate Packages Index
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          make package/index V=s
+
+      - name: Collect Failed Logs
+        if: always()
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          echo 'Build Failed Packages:'
+          cat logs/package/error.txt | awk '{print $2}'
+          cat logs/package/error.txt | awk '{print $2}' | sed 's/$/&\//g' > failed-packages.txt
+          mkdir -p faillogs
+          rsync -aq --files-from=failed-packages.txt logs/ faillogs/
+          cp -f logs/package/error.txt faillogs
+
+      - name: Upload Failed Logs To Artifact
+        if: always()
+        uses: actions/upload-artifact@main
+        with:
+          name: Logs-${{ env.DEVICE_PLATFORM }}
+          path: ${{ env.OPENWRT_ROOT_PATH }}/faillogs
+          if-no-files-found: ignore
+
+      - name: Deploy Files To Backblaze
+        continue-on-error: true
+        env:
+          B2_APPLICATION_KEY: "${{ secrets.B2_APPLICATION_KEY }}"
+          B2_APPLICATION_KEY_ID: "${{ secrets.B2_APPLICATION_KEY_ID }}"
+          SOURCE_PACKAGES: "${{ env.OPENWRT_ROOT_PATH }}/bin/packages/${{ env.DEVICE_PLATFORM }}/"
+          DEST_PACKAGES: "b2://${{ secrets.B2_BUCKETNAME }}/snapshots/packages/${{ env.DEVICE_PLATFORM }}/"
+        if: env.B2_APPLICATION_KEY != null && env.B2_APPLICATION_KEY_ID != null
+        run: |
+          b2 authorize-account $B2_APPLICATION_KEY_ID $B2_APPLICATION_KEY
+          b2 sync --noProgress --threads 32 --keepDays 7 --replaceNewer $SOURCE_PACKAGES $DEST_PACKAGES
+
+      - name: Deploy FailLogs To Backblaze
+        continue-on-error: true
+        env:
+          B2_APPLICATION_KEY: "${{ secrets.B2_APPLICATION_KEY }}"
+          B2_APPLICATION_KEY_ID: "${{ secrets.B2_APPLICATION_KEY_ID }}"
+          SOURCE_FAILLOGS: "${{ env.OPENWRT_ROOT_PATH }}/faillogs/"
+          DEST_FAILLOGS: "b2://${{ secrets.B2_BUCKETNAME }}/snapshots/faillogs/packages/${{ env.DEVICE_PLATFORM }}/"
+        if: env.B2_APPLICATION_KEY != null && env.B2_APPLICATION_KEY_ID != null
+        run: |
+          b2 authorize-account $B2_APPLICATION_KEY_ID $B2_APPLICATION_KEY
+          b2 sync --noProgress --threads 32 --keepDays 7 --replaceNewer $SOURCE_FAILLOGS $DEST_FAILLOGS
+
+      - name: Deploy Files To Server
+        continue-on-error: true
+        env:
+          HOST: "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}"
+          SOURCE_PACKAGES: "${{ env.OPENWRT_ROOT_PATH }}/bin/packages/${{ env.DEVICE_PLATFORM }}/"
+          DEST_PACKAGES: "${{ env.WEB_ROOT_PATH }}/snapshots/packages/${{ env.DEVICE_PLATFORM }}/"
+          SERVER_PRIVATEKEY: "${{ secrets.SERVER_PRIVATEKEY }}"
+        if: env.SERVER_PRIVATEKEY != null
+        run: |
+          mkdir -p ~/.ssh/
+          install -m 600 /dev/null ~/.ssh/id_rsa
+          echo "${{ secrets.SERVER_PRIVATEKEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST \
+          bash -c "'mkdir -p $DEST_PACKAGES'"
+          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_PACKAGES $HOST:$DEST_PACKAGES
+
+      - name: Deploy FailLogs To Server
+        continue-on-error: true
+        env:
+          HOST: "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}"
+          SOURCE_FAILLOGS: "${{ env.OPENWRT_ROOT_PATH }}/faillogs/"
+          DEST_FAILLOGS: "${{ env.WEB_ROOT_PATH }}/snapshots/faillogs/packages/${{ env.DEVICE_PLATFORM }}/"
+          SERVER_PRIVATEKEY: "${{ secrets.SERVER_PRIVATEKEY }}"
+        if: env.SERVER_PRIVATEKEY != null && always()
+        run: |
+          mkdir -p ~/.ssh/
+          install -m 600 /dev/null ~/.ssh/id_rsa
+          echo "${{ secrets.SERVER_PRIVATEKEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST bash -c "'mkdir -p $DEST_FAILLOGS'"
+          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_FAILLOGS $HOST:$DEST_FAILLOGS
+
+      - name: Clean Process
+        if: always()
+        run: |
+          sync
+          ps -ef | grep OpenWrt-Buildbot | awk '{print $2}' | xargs sudo kill -9 || true
+          sleep 30
+          sudo umount $OPENWRT_ROOT_PATH || true
+          sudo umount workspace/openwrt-ro || true
+          mkdir -p empty
+          sudo rsync --delete-before --force -r empty/ workspace/
+          rm -rf empty workspace

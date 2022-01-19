@@ -6,15 +6,14 @@
 # Blog: https://p3terx.com
 #=================================================
 
-name: Cache OpenWrt Packages
+name: Cache Packages
 
 on:
   repository_dispatch:
+    types: [cache]
   workflow_dispatch:
   schedule:
     - cron: 0 18 * * *
-#  watch:
-#    types: started
 
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
@@ -22,47 +21,32 @@ env:
 
 jobs:
   Build:
-    runs-on: project-cache
+    runs-on: cache
 
     steps:
       - name: Checkout
         uses: actions/checkout@main
-
-      - name: Initialization Environment
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          sudo -E apt-get -qq update
-          sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804)
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
 
       - name: Clone Source Code
         run: |
           df -hT $PWD
           git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
 
-      - name: Update Feeds
-        run: |
-          cd openwrt
-          echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
-          ./scripts/feeds update -a
-
       - name: Install Feeds
         run: |
-          cd $OPENWRTROOT
+          cd openwrt
+          ./scripts/feeds update -a
           ./scripts/feeds install -a
 
       - name: Download All Packages
         run: |
-          cd $OPENWRTROOT
-          wget -q https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/download.pl -O scripts/download.pl
+          cd openwrt
           echo "CONFIG_ALL=y" >> .config
           make defconfig
-          make download -j16 IGNORE_ERRORS=1
+          make download -j32 IGNORE_ERRORS=1
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
           mkdir -p /data/cache
           rm -rf /data/cache/dl
-          cp -r dl /data/cache
+          mv dl /data/cache
 

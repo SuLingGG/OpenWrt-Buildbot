@@ -1,0 +1,487 @@
+#=================================================
+# https://github.com/P3TERX/Actions-OpenWrt
+# Description: Build OpenWrt using GitHub Actions
+# Lisence: MIT
+# Author: P3TERX
+# Blog: https://p3terx.com
+#=================================================
+
+name: Build Targets
+
+on:
+  repository_dispatch:
+    types: [targets]
+  workflow_dispatch:
+    inputs:
+      INPUT_TARGET:
+        description: "Target to build (platform/target/subtarget)"
+        required: false
+        default: "all"
+  schedule:
+    - cron: 0 2 * * *
+
+env:
+  SOURCE_URL: https://github.com/immortalwrt/immortalwrt
+  SOURCE_BRANCH: openwrt-18.06-k5.4
+  CURRENT_BRANCH: main
+  WEB_ROOT_PATH: /data/www/openwrt.cc
+  TOOLCHAIN_TAG: toolchain
+  TZ: Asia/Shanghai
+
+jobs:
+  Config:
+    name: Generate Config
+    runs-on: ubuntu-20.04
+    outputs:
+      TARGETS: ${{ steps.find-targets.outputs.TARGETS }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Clone Source Code
+        run: |
+          git clone --depth=1 $SOURCE_URL -b $SOURCE_BRANCH openwrt
+
+      - name: Find Targets
+        id: find-targets
+        env:
+          INPUT_TARGET: ${{ github.event.inputs.INPUT_TARGET }}
+        run: |
+          if [ "$INPUT_TARGET" = "all" ] || [ "$INPUT_TARGET" = "" ]; then
+            export TARGETS="$(cat $GITHUB_WORKSPACE/data/support/targets.config)"
+          else
+            export TARGETS="$INPUT_TARGET"
+          fi
+          JSON='{"config": ["default"], "targets":['
+          FIRST=1
+          for TARGET in $TARGETS; do
+          [[ $FIRST -ne 1 ]] && JSON="$JSON"','
+          JSON="$JSON"'"'"${TARGET}"'"'
+          FIRST=0
+          done
+          JSON="$JSON"']}'
+          echo $JSON
+          echo "::set-output name=TARGETS::$JSON"
+
+  Targets:
+    name: Targets ${{ matrix.TARGETS }}
+    needs: [Config]
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix: ${{fromJson(needs.Config.outputs.TARGETS)}}
+
+    steps:
+      - name: Initialization Environment
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo -E rm -rf /etc/apt/sources.list.d/*
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq install squashfs-tools $(curl -fsSL git.io/depends-ubuntu-2004)
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -y purge azure* dotnet* firefox ghc* google* hhvm llvm* mono* mysql* openjdk* php* zulu* powershell* msodbc*
+          sudo -E apt-get -qq clean
+          sudo -E rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /etc/mysql /etc/php /usr/local/share/boost
+          sudo -E snap set system refresh.retain=2
+          sudo -E docker image prune -a -f
+          sudo -E ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+
+      - name: Combine Disks
+        run: |
+          sudo swapoff -a
+          sudo rm -f /mnt/swapfile
+          export ROOT_FREE_KB=$(df --block-size=1024 --output=avail / | tail -1)
+          export ROOT_LOOP_KB=$(expr $ROOT_FREE_KB - 1048576)
+          export ROOT_LOOP_BYTES=$(expr $ROOT_LOOP_KB \* 1024)
+          sudo fallocate -l $ROOT_LOOP_BYTES /root.img
+          export ROOT_LOOP_DEVNAME=$(sudo losetup -Pf --show /root.img)
+          sudo pvcreate -f $ROOT_LOOP_DEVNAME
+          export MNT_FREE_KB=$(df --block-size=1024 --output=avail /mnt | tail -1)
+          export MNT_LOOP_KB=$(expr $MNT_FREE_KB - 102400)
+          export MNT_LOOP_BYTES=$(expr $MNT_LOOP_KB \* 1024)
+          sudo fallocate -l $MNT_LOOP_BYTES /mnt/mnt.img
+          export MNT_LOOP_DEVNAME=$(sudo losetup -Pf --show /mnt/mnt.img)
+          sudo pvcreate -f $MNT_LOOP_DEVNAME
+          sudo vgcreate vgstorage $ROOT_LOOP_DEVNAME $MNT_LOOP_DEVNAME
+          sudo lvcreate -n lvstorage -l 100%FREE vgstorage
+          export LV_DEVNAME=$(sudo lvscan | awk -F "'" '{print $2}')
+          sudo mkfs.btrfs -L combinedisk $LV_DEVNAME
+          sudo mount -o compress=zstd $LV_DEVNAME $GITHUB_WORKSPACE
+          sudo chown -R runner:runner $GITHUB_WORKSPACE
+          mkdir -p $GITHUB_WORKSPACE/tmp
+          chmod 777 $GITHUB_WORKSPACE/tmp
+          sudo cp -rp /tmp/* $GITHUB_WORKSPACE/tmp
+          sudo mount -B $GITHUB_WORKSPACE/tmp /tmp
+
+      - name: Print Disk Usage Information
+        run: |
+          sudo btrfs filesystem usage $GITHUB_WORKSPACE
+
+      - name: Checkout
+        run: |
+          cd $GITHUB_WORKSPACE
+          git init
+          git remote add origin https://github.com/$GITHUB_REPOSITORY
+          git fetch
+          git checkout -t origin/$CURRENT_BRANCH
+
+      - name: Generate Variables
+        id: env
+        run: |
+          export SOURCE_OWNER=$(echo $SOURCE_URL | awk -F '/' '{print $(NF-1)}')
+          echo "SOURCE_OWNER=$SOURCE_OWNER" >> $GITHUB_ENV
+          export SOURCE_REPO=$(echo $SOURCE_URL | awk -F '/' '{print $(NF)}')
+          echo "SOURCE_REPO=$SOURCE_REPO" >> $GITHUB_ENV
+          export DEVICE_PLATFORM=$(echo ${{ matrix.TARGETS }} | awk -F '/' '{print $1}')
+          echo "DEVICE_PLATFORM=$DEVICE_PLATFORM" >> $GITHUB_ENV
+          export DEVICE_TARGET=$(echo ${{ matrix.TARGETS }} | awk -F '/' '{print $2}')
+          echo "DEVICE_TARGET=$DEVICE_TARGET" >> $GITHUB_ENV
+          export DEVICE_SUBTARGET=$(echo ${{ matrix.TARGETS }} | awk -F '/' '{print $3}')
+          echo "DEVICE_SUBTARGET=$DEVICE_SUBTARGET" >> $GITHUB_ENV
+          export TARGET_INFO="$SOURCE_OWNER-$SOURCE_REPO-$SOURCE_BRANCH-$DEVICE_TARGET-$DEVICE_SUBTARGET"
+          echo "TARGET_INFO=$TARGET_INFO" >> $GITHUB_ENV
+          mkdir -p workspace/openwrt
+          cd workspace/openwrt
+          echo "OPENWRT_ROOT_PATH=$PWD" >> $GITHUB_ENV
+
+      - name: Compare Toolchain Hash
+        id: hash
+        run: |
+          export TOOLS_HASH=$(curl -fsSL \
+            https://api.github.com/repos/$SOURCE_OWNER/$SOURCE_REPO/commits\?sha\=$SOURCE_BRANCH\&path\=tools | jq '.[0] | .sha' | sed 's/"//g')
+          export TOOLCHAIN_HASH=$(curl -fsSL \
+            https://api.github.com/repos/$SOURCE_OWNER/$SOURCE_REPO/commits\?sha\=$SOURCE_BRANCH\&path\=toolchain | jq '.[0] | .sha' | sed 's/"//g')
+          export CURRENT_HASH=$(echo -n "$TOOLS_HASH$TOOLCHAIN_HASH" | md5sum | awk '{print $1}')
+          echo "CURRENT_HASH=$CURRENT_HASH" >> $GITHUB_ENV
+          echo "CURRENT_HASH is $CURRENT_HASH"
+          export CACHE_HASH=$(curl -fSsL https://github.com/$GITHUB_REPOSITORY/releases/download/$TOOLCHAIN_TAG/toolchain-${TARGET_INFO}.hash)
+          echo "CACHE_HASH is $CACHE_HASH"
+          if [ -z "$CACHE_HASH" ] || [ "$CURRENT_HASH" != "$CACHE_HASH" ]; then
+            echo "::set-output name=REBUILD_TOOLCHAIN::true"
+          fi
+
+      - name: Clone Source Code
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        id: clone
+        run: |
+          git clone $SOURCE_URL -b $SOURCE_BRANCH $OPENWRT_ROOT_PATH
+
+      - name: Generate Config File
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          echo CONFIG_TARGET_${DEVICE_TARGET}=y > .config
+          echo CONFIG_TARGET_${DEVICE_TARGET}_${DEVICE_SUBTARGET}=y >> .config
+          cat $GITHUB_WORKSPACE/config/packages.config >> .config
+          if echo $DEVICE_TARGET | grep -q x86; then
+            cat $GITHUB_WORKSPACE/config/x86.config >> .config
+          fi
+
+      - name: Install Feeds
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          make defconfig
+
+      - name: Compile Tools
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          make tools/compile -j$(nproc) BUILD_LOG=1 || make tools/compile -j1 V=s
+
+      - name: Compile Toolchain
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          make toolchain/compile -j$(nproc) BUILD_LOG=1 || make toolchain/compile -j1 V=s
+
+      - name: Upload Toolchain Logs
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        uses: actions/upload-artifact@main
+        with:
+          name: Logs-${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}
+          path: ${{ env.OPENWRT_ROOT_PATH }}/logs
+          if-no-files-found: ignore
+
+      - name: Clean Process
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          ./scripts/feeds clean
+          make clean
+          rm -rf .config* bin dl logs tmp
+
+      - name: Generate Toolchain Image
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        run: |
+          cd workspace
+          mksquashfs openwrt toolchain-${TARGET_INFO}.img -force-gid 1001 -force-uid 1001 -comp zstd
+          mkdir -p $GITHUB_WORKSPACE/output
+          split -d -b 1900M toolchain-${TARGET_INFO}.img $GITHUB_WORKSPACE/output/toolchain-${TARGET_INFO}.img.
+          rm toolchain-${TARGET_INFO}.img
+          cd $OPENWRT_ROOT_PATH
+          echo $CURRENT_HASH > $GITHUB_WORKSPACE/output/toolchain-${TARGET_INFO}.hash
+          ls -lh $GITHUB_WORKSPACE/output
+
+      - name: Delete Old Toolchain Assets
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        uses: mknejp/delete-release-assets@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ env.TOOLCHAIN_TAG }}
+          assets: "toolchain-${{ env.TARGET_INFO }}.*"
+          fail-if-no-assets: false
+          fail-if-no-release: false
+
+      - name: Upload Toolchain Image To Release
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        uses: ncipollo/release-action@v1.8.0
+        with:
+          name: toolchain-image
+          allowUpdates: true
+          replacesArtifacts: true
+          tag: ${{ env.TOOLCHAIN_TAG }}
+          commit: ${{ env.CURRENT_BRANCH }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: output/*
+
+      - name: Clean Toolchain Image
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN == 'true'
+        run: |
+          rm -rf output
+
+      - name: Prepare Toolchain Image
+        if: steps.hash.outputs.REBUILD_TOOLCHAIN != 'true'
+        run: |
+          mkdir -p workspace
+          cd workspace
+          for i in {0..9}
+          do
+            curl -fsL https://github.com/$GITHUB_REPOSITORY/releases/download/$TOOLCHAIN_TAG/toolchain-${TARGET_INFO}.img.0$i >> toolchain-${TARGET_INFO}.img || break
+          done
+          mkdir -p openwrt-ro openwrt workdir overlay
+          sudo mount -o loop toolchain-${TARGET_INFO}.img openwrt-ro
+          sudo mount -t overlay overlay -o lowerdir=openwrt-ro,upperdir=overlay,workdir=workdir openwrt
+          sudo chown runner:runner $OPENWRT_ROOT_PATH
+          cd $OPENWRT_ROOT_PATH
+          git pull
+
+      - name: Import Build Keys
+        env:
+          BUILD_PRIVATEKEY: ${{ secrets.BUILD_PRIVATEKEY }}
+          BUILD_PUBLICKEY: ${{ secrets.BUILD_PUBLICKEY }}
+        if: env.BUILD_PRIVATEKEY != null && env.BUILD_PUBLICKEY != null
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          echo -e "$BUILD_PRIVATEKEY" > key-build
+          echo -e "$BUILD_PUBLICKEY" > key-build.pub
+          wc -c key-build key-build.pub
+          git clone https://git.openwrt.org/project/usign.git
+          cd usign
+          cmake .
+          make
+          export PUBLICKEY_FINGERPRINT=$(./usign -F -p $OPENWRT_ROOT_PATH/key-build.pub)
+          cd $OPENWRT_ROOT_PATH
+          mkdir -p files/etc/opkg/keys
+          cp key-build.pub files/etc/opkg/keys/$PUBLICKEY_FINGERPRINT
+
+      - name: Install Feeds
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Generate Config File
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          echo CONFIG_TARGET_${DEVICE_TARGET}=y > .config
+          echo CONFIG_TARGET_${DEVICE_TARGET}_${DEVICE_SUBTARGET}=y >> .config
+          cat $GITHUB_WORKSPACE/config/targets.config >> .config
+          if echo $DEVICE_TARGET | grep -q x86; then
+            cat $GITHUB_WORKSPACE/config/x86.config >> .config
+          fi
+          echo -e "\n---- Original Config Start ----\n"
+          cat .config
+          echo -e "\n---- Original Config End ----\n"
+          make defconfig
+          echo -e "\n---- Whole Config Start ----\n"
+          cat .config
+          echo -e "\n---- Whole Config End ----\n"
+
+      - name: Download Source Packages
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          make download -j64
+
+      - name: Generate Target Information
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          make diffconfig buildversion feedsversion
+          cp .config bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET/config.orig
+
+      - name: Compile Kmods
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          make target/compile -j$(nproc) IGNORE_ERRORS="m n" BUILD_LOG=1 || \
+          yes n | make target/compile -j1 V=s IGNORE_ERRORS=1
+
+      - name: Compile Packages
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          make package/compile -j$(nproc) IGNORE_ERRORS="y m n" BUILD_LOG=1 || make package/compile -j1 V=s
+          make package/install -j$(nproc) BUILD_LOG=1 || make package/install -j1 V=s
+
+      - name: Generate Firmware Tools
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          make target/install -j$(nproc) \
+            CONFIG_TARGET_ROOTFS_EXT4FS=n \
+            CONFIG_TARGET_ROOTFS_INITRAMFS=n \
+            CONFIG_TARGET_ROOTFS_SQUASHFS=n \
+            CONFIG_TARGET_ROOTFS_UBIFS=n \
+            BUILD_LOG=1 || \
+          make target/install -j1 V=s \
+            CONFIG_TARGET_ROOTFS_EXT4FS=n \
+            CONFIG_TARGET_ROOTFS_INITRAMFS=n \
+            CONFIG_TARGET_ROOTFS_SQUASHFS=n \
+            CONFIG_TARGET_ROOTFS_UBIFS=n
+
+      - name: Add Kmods Feed
+        run: |
+          cd $OPENWRT_ROOT_PATH/bin/targets/$DEVICE_TARGET
+          if [ "$(ls)" != "$DEVICE_SUBTARGET" ]; then
+            mv $(ls) $DEVICE_SUBTARGET
+          fi
+          cd $OPENWRT_ROOT_PATH
+          export TOPDIR=$(pwd)
+          export KERNEL_VERSION="$(make --no-print-directory -C target/linux \
+            val.LINUX_VERSION val.LINUX_RELEASE val.LINUX_VERMAGIC | \
+            tr '\n' '-' | head -c -1)"
+          echo "KERNEL_VERSION=$KERNEL_VERSION" >> $GITHUB_ENV
+          mkdir -p bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET/kmods/$KERNEL_VERSION
+          rsync --remove-source-files --include=/kmod-*.ipk --exclude=* -av \
+            $OPENWRT_ROOT_PATH/bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET/packages/ \
+            $OPENWRT_ROOT_PATH/bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET/kmods/$KERNEL_VERSION/
+          cp -f bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET/packages/kernel* \
+            bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET/kmods/$KERNEL_VERSION
+
+      - name: Set Opkg Configuration
+        run: |
+          sed -i "s/DEVICE_TARGET/$DEVICE_TARGET/g; \
+            s/DEVICE_SUBTARGET/$DEVICE_SUBTARGET/g; \
+            s/KERNEL_VERSION/$KERNEL_VERSION/g; \
+            s/DEVICE_PLATFORM/$DEVICE_PLATFORM/g" $GITHUB_WORKSPACE/data/opkg/distfeeds.conf
+          echo -e "\n---- Distfeeds.conf Start----\n"
+          cat $GITHUB_WORKSPACE/data/opkg/distfeeds.conf
+          echo -e "\n---- Distfeeds.conf End----\n"
+
+      - name: Generate Packages Index
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          make package/index V=s PACKAGE_SUBDIRS=bin/packages/$DEVICE_PLATFORM/
+          make package/index V=s PACKAGE_SUBDIRS=bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET/kmods/$KERNEL_VERSION/
+          make package/index V=s PACKAGE_SUBDIRS=bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET/packages/
+
+      - name: Generate Firmware
+        run: |
+          tar -xf $OPENWRT_ROOT_PATH/bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET/*imagebuilder*.tar.xz -C .
+          cd $(ls | grep imagebuilder)
+          sed -i '/luci-app-cpufreq/d' include/target.mk
+          mkdir -p files/etc/opkg
+          cp $GITHUB_WORKSPACE/data/opkg/distfeeds.conf files/etc/opkg
+          export PROFILE_NAMES=$(make val.PROFILE_NAMES | sed 's/DEVICE_//g')
+          export I18N_PACKAGES=$(cat $GITHUB_WORKSPACE/config/i18n.config)
+          for PROFILE in `echo $PROFILE_NAMES`;
+            do
+            make image PROFILE=$PROFILE FILES="files" PACKAGES="$I18N_PACKAGES" || \
+            true;
+          done
+          mv -f bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET/* $OPENWRT_ROOT_PATH/bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET/
+
+      - name: Collect FailLogs
+        if: always()
+        continue-on-error: true
+        run: |
+          cd $OPENWRT_ROOT_PATH
+          echo 'Build Failed Packages:'
+          cat logs/package/error.txt | awk '{print $2}'
+          cat logs/package/error.txt | awk '{print $2}' | sed 's/$/&\//g' > failed-packages.txt
+          mkdir -p faillogs
+          rsync -aq --files-from=failed-packages.txt logs/ faillogs/
+          cp -f logs/package/error.txt faillogs
+
+      - name: Upload FailLogs To Artifact
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@main
+        with:
+          name: Logs-${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}
+          path: ${{ env.OPENWRT_ROOT_PATH }}/faillogs/
+          if-no-files-found: ignore
+
+      - name: Deploy Files To Backblaze
+        continue-on-error: true
+        env:
+          B2_APPLICATION_KEY: "${{ secrets.B2_APPLICATION_KEY }}"
+          B2_APPLICATION_KEY_ID: "${{ secrets.B2_APPLICATION_KEY_ID }}"
+          SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/"
+          DEST_TARGETS: "b2://${{ secrets.B2_BUCKETNAME }}/snapshots/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/"
+        if: env.B2_APPLICATION_KEY != null && env.B2_APPLICATION_KEY_ID != null
+        run: |
+          sudo wget -q -O /bin/b2 https://github.com/Backblaze/B2_Command_Line_Tool/releases/latest/download/b2-linux
+          sudo chmod +x /bin/b2
+          b2 authorize-account $B2_APPLICATION_KEY_ID $B2_APPLICATION_KEY
+          b2 sync --noProgress --threads 32 --keepDays 7 --replaceNewer $SOURCE_TARGETS $DEST_TARGETS
+
+      - name: Deploy FailLogs To Backblaze
+        continue-on-error: true
+        env:
+          B2_APPLICATION_KEY: "${{ secrets.B2_APPLICATION_KEY }}"
+          B2_APPLICATION_KEY_ID: "${{ secrets.B2_APPLICATION_KEY_ID }}"
+          SOURCE_FAILLOGS: "${{ env.OPENWRT_ROOT_PATH }}/faillogs/"
+          DEST_FAILLOGS: "b2://${{ secrets.B2_BUCKETNAME }}/snapshots/faillogs/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/"
+        if: env.B2_APPLICATION_KEY != null && env.B2_APPLICATION_KEY_ID != null
+        run: |
+          b2 authorize-account $B2_APPLICATION_KEY_ID $B2_APPLICATION_KEY
+          b2 sync --noProgress --threads 32 --keepDays 7 --replaceNewer $SOURCE_FAILLOGS $DEST_FAILLOGS
+
+      - name: Deploy Files To Server
+        continue-on-error: true
+        env:
+          HOST: "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}"
+          SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/"
+          DEST_TARGETS: "${{ env.WEB_ROOT_PATH }}/snapshots/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/"
+          SERVER_PRIVATEKEY: "${{ secrets.SERVER_PRIVATEKEY }}"
+        if: env.SERVER_PRIVATEKEY != null
+        run: |
+          mkdir -p ~/.ssh/
+          install -m 600 /dev/null ~/.ssh/id_rsa
+          echo "${{ secrets.SERVER_PRIVATEKEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST bash -c "'mkdir -p $DEST_TARGETS $DEST_FAILLOGS'"
+          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
+
+      - name: Deploy FailLogs To Server
+        continue-on-error: true
+        env:
+          HOST: "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}"
+          SOURCE_FAILLOGS: "${{ env.OPENWRT_ROOT_PATH }}/faillogs/"
+          DEST_FAILLOGS: "${{ env.WEB_ROOT_PATH }}/snapshots/faillogs/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/"
+          SERVER_PRIVATEKEY: "${{ secrets.SERVER_PRIVATEKEY }}"
+        if: env.SERVER_PRIVATEKEY != null && always()
+        run: |
+          mkdir -p ~/.ssh/
+          install -m 600 /dev/null ~/.ssh/id_rsa
+          echo "${{ secrets.SERVER_PRIVATEKEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST bash -c "'mkdir -p $DEST_FAILLOGS'"
+          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_FAILLOGS $HOST:$DEST_FAILLOGS
+
+      - name: Print Disk Usage Information
+        if: always()
+        run: |
+          sudo btrfs filesystem usage $GITHUB_WORKSPACE

@@ -435,7 +435,8 @@ jobs:
           sudo wget -q -O /bin/b2 https://github.com/Backblaze/B2_Command_Line_Tool/releases/latest/download/b2-linux
           sudo chmod +x /bin/b2
           b2 authorize-account $B2_APPLICATION_KEY_ID $B2_APPLICATION_KEY
-          b2 sync --noProgress --threads 32 --keepDays 7 --replaceNewer $SOURCE_TARGETS $DEST_TARGETS
+          b2 sync --noProgress --threads 32 --keepDays 7 --replaceNewer --excludeRegex 'kmods' $SOURCE_TARGETS $DEST_TARGETS
+          b2 sync --noProgress --threads 32 --keepDays 7 --replaceNewer $SOURCE_TARGETS/kmods/$KERNEL_VERSION $DEST_TARGETS/kmods/$KERNEL_VERSION
 
       - name: Deploy FailLogs To Backblaze
         continue-on-error: true
@@ -462,8 +463,9 @@ jobs:
           install -m 600 /dev/null ~/.ssh/id_rsa
           echo "${{ secrets.SERVER_PRIVATEKEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST bash -c "'mkdir -p $DEST_TARGETS $DEST_FAILLOGS'"
-          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
+          ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST bash -c "'mkdir -p $DEST_TARGETS $DEST_TARGETS/kmods/$KERNEL_VERSION $DEST_FAILLOGS'"
+          rsync -chavP --delete --exclude "kmods" -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
+          rsync -chavP -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS/kmods/$KERNEL_VERSION $HOST:$DEST_TARGETS/kmods/$KERNEL_VERSION
 
       - name: Deploy FailLogs To Server
         continue-on-error: true

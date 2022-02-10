@@ -428,8 +428,8 @@ jobs:
         env:
           B2_APPLICATION_KEY: "${{ secrets.B2_APPLICATION_KEY }}"
           B2_APPLICATION_KEY_ID: "${{ secrets.B2_APPLICATION_KEY_ID }}"
-          SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/"
-          DEST_TARGETS: "b2://${{ secrets.B2_BUCKETNAME }}/snapshots/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/"
+          SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}"
+          DEST_TARGETS: "b2://${{ secrets.B2_BUCKETNAME }}/snapshots/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}"
         if: env.B2_APPLICATION_KEY != null && env.B2_APPLICATION_KEY_ID != null
         run: |
           sudo wget -q -O /bin/b2 https://github.com/Backblaze/B2_Command_Line_Tool/releases/latest/download/b2-linux
@@ -443,19 +443,19 @@ jobs:
         env:
           B2_APPLICATION_KEY: "${{ secrets.B2_APPLICATION_KEY }}"
           B2_APPLICATION_KEY_ID: "${{ secrets.B2_APPLICATION_KEY_ID }}"
-          SOURCE_FAILLOGS: "${{ env.OPENWRT_ROOT_PATH }}/faillogs/"
-          DEST_FAILLOGS: "b2://${{ secrets.B2_BUCKETNAME }}/snapshots/faillogs/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/"
+          SOURCE_FAILLOGS: "${{ env.OPENWRT_ROOT_PATH }}/faillogs"
+          DEST_FAILLOGS: "b2://${{ secrets.B2_BUCKETNAME }}/snapshots/faillogs/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}"
         if: env.B2_APPLICATION_KEY != null && env.B2_APPLICATION_KEY_ID != null
         run: |
           b2 authorize-account $B2_APPLICATION_KEY_ID $B2_APPLICATION_KEY
-          b2 sync --noProgress --threads 32 --keepDays 7 --replaceNewer $SOURCE_FAILLOGS $DEST_FAILLOGS
+          b2 sync --noProgress --threads 32 --keepDays 7 --replaceNewer $SOURCE_FAILLOGS/ $DEST_FAILLOGS/
 
       - name: Deploy Files To Server
         continue-on-error: true
         env:
           HOST: "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}"
-          SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/"
-          DEST_TARGETS: "${{ env.WEB_ROOT_PATH }}/snapshots/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/"
+          SOURCE_TARGETS: "${{ env.OPENWRT_ROOT_PATH }}/bin/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}"
+          DEST_TARGETS: "${{ env.WEB_ROOT_PATH }}/snapshots/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}"
           SERVER_PRIVATEKEY: "${{ secrets.SERVER_PRIVATEKEY }}"
         if: env.SERVER_PRIVATEKEY != null
         run: |
@@ -464,15 +464,15 @@ jobs:
           echo "${{ secrets.SERVER_PRIVATEKEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST bash -c "'mkdir -p $DEST_TARGETS $DEST_TARGETS/kmods/$KERNEL_VERSION $DEST_FAILLOGS'"
-          rsync -chavP --delete --exclude "kmods" -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS $HOST:$DEST_TARGETS
+          rsync -chavP --delete --exclude "kmods" -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS/ $HOST:$DEST_TARGETS/
           rsync -chavP -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS/kmods/$KERNEL_VERSION $HOST:$DEST_TARGETS/kmods/$KERNEL_VERSION
 
       - name: Deploy FailLogs To Server
         continue-on-error: true
         env:
           HOST: "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}"
-          SOURCE_FAILLOGS: "${{ env.OPENWRT_ROOT_PATH }}/faillogs/"
-          DEST_FAILLOGS: "${{ env.WEB_ROOT_PATH }}/snapshots/faillogs/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}/"
+          SOURCE_FAILLOGS: "${{ env.OPENWRT_ROOT_PATH }}/faillogs"
+          DEST_FAILLOGS: "${{ env.WEB_ROOT_PATH }}/snapshots/faillogs/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}"
           SERVER_PRIVATEKEY: "${{ secrets.SERVER_PRIVATEKEY }}"
         if: env.SERVER_PRIVATEKEY != null && always()
         run: |
@@ -481,7 +481,7 @@ jobs:
           echo "${{ secrets.SERVER_PRIVATEKEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST bash -c "'mkdir -p $DEST_FAILLOGS'"
-          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_FAILLOGS $HOST:$DEST_FAILLOGS
+          rsync -chavP --delete -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_FAILLOGS/ $HOST:$DEST_FAILLOGS/
 
       - name: Print Disk Usage Information
         if: always()

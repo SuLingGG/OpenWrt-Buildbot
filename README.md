@@ -8,6 +8,7 @@
 5. 提供各大 OpenWrt 项目 / 分支的源码包 (dl) 镜像
 6. 提供全格式固件 / 文件 (ext4/squashfs/ubi/initramfs/rootfs)
 7. 对于高级用户，提供完整的固件/软件包构建工具 (imagebuilder / sdk / toolchain)
+8. 如果你想捐助此项目，请移步 [FUNDING.md](https://github.com/SuLingGG/OpenWrt-Buildbot/blob/main/FUNDING.md)
 
 ## 文档
 

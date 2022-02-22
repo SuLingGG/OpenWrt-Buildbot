@@ -465,7 +465,7 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh -q -t -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $HOST bash -c "'mkdir -p $DEST_TARGETS $DEST_TARGETS/kmods/$KERNEL_VERSION $DEST_FAILLOGS'"
           rsync -chavP --delete --exclude "kmods" -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS/ $HOST:$DEST_TARGETS/
-          rsync -chavP -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS/kmods/$KERNEL_VERSION $HOST:$DEST_TARGETS/kmods/$KERNEL_VERSION
+          rsync -chavP -e 'ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no' $SOURCE_TARGETS/kmods/$KERNEL_VERSION/ $HOST:$DEST_TARGETS/kmods/$KERNEL_VERSION/
 
       - name: Deploy FailLogs To Server
         continue-on-error: true

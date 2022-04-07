@@ -407,6 +407,14 @@ jobs:
           cd $OPENWRT_ROOT_PATH/bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET
           cat sha256sums
 
+      - name: Print Signatures
+        run: |
+          cd $OPENWRT_ROOT_PATH/bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET
+          echo "Signature of kmods:"
+          cat kmods/$KERNEL_VERSION/Packages.sig
+          echo "Signature of other non-shared packages:"
+          cat packages/Packages.sig
+
       - name: Collect FailLogs
         if: always()
         continue-on-error: true

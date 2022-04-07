@@ -166,6 +166,20 @@ jobs:
           cd $OPENWRT_ROOT_PATH
           make package/index V=s
 
+      - name: Print Signatures
+        run: |
+          cd $OPENWRT_ROOT_PATH/bin/packages/$DEVICE_PLATFORM
+          echo "Signature of base packages:"
+          cat base/Packages.sig
+          echo "Signature of luci packages:"
+          cat luci/Packages.sig
+          echo "Signature of packages packages:"
+          cat packages/Packages.sig
+          echo "Signature of routing packages:"
+          cat routing/Packages.sig
+          echo "Signature of telephony packages:"
+          cat telephony/Packages.sig
+
       - name: Collect Failed Logs
         if: always()
         run: |

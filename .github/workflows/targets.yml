@@ -402,6 +402,11 @@ jobs:
           done
           mv -f bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET/* $OPENWRT_ROOT_PATH/bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET/
 
+      - name: Print Sha256sums
+        run: |
+          cd $OPENWRT_ROOT_PATH/bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET
+          cat sha256sums
+
       - name: Collect FailLogs
         if: always()
         continue-on-error: true

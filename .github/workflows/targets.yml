@@ -448,8 +448,8 @@ jobs:
           sudo wget -q -O /bin/b2 https://github.com/Backblaze/B2_Command_Line_Tool/releases/latest/download/b2-linux
           sudo chmod +x /bin/b2
           b2 authorize-account $B2_APPLICATION_KEY_ID $B2_APPLICATION_KEY
-          b2 sync --noProgress --threads 32 --keepDays 7 --replaceNewer --excludeRegex 'kmods' $SOURCE_TARGETS $DEST_TARGETS
-          b2 sync --noProgress --threads 32 --keepDays 7 --replaceNewer $SOURCE_TARGETS/kmods/$KERNEL_VERSION $DEST_TARGETS/kmods/$KERNEL_VERSION
+          b2 sync --noProgress --threads 16 --keepDays 7 --replaceNewer --excludeRegex '(.*kmods)' $SOURCE_TARGETS $DEST_TARGETS
+          b2 sync --noProgress --threads 16 --keepDays 7 --replaceNewer $SOURCE_TARGETS/kmods/$KERNEL_VERSION $DEST_TARGETS/kmods/$KERNEL_VERSION
 
       - name: Deploy FailLogs To Backblaze
         continue-on-error: true
@@ -461,7 +461,7 @@ jobs:
         if: env.B2_APPLICATION_KEY != null && env.B2_APPLICATION_KEY_ID != null
         run: |
           b2 authorize-account $B2_APPLICATION_KEY_ID $B2_APPLICATION_KEY
-          b2 sync --noProgress --threads 32 --keepDays 7 --replaceNewer $SOURCE_FAILLOGS/ $DEST_FAILLOGS/
+          b2 sync --noProgress --threads 16 --keepDays 7 --replaceNewer $SOURCE_FAILLOGS/ $DEST_FAILLOGS/
 
       - name: Deploy Files To Server
         continue-on-error: true

@@ -152,14 +152,14 @@ jobs:
       - name: Compile Kmods
         run: |
           cd $OPENWRT_ROOT_PATH
-          make target/compile -j$(nproc) IGNORE_ERRORS="m n" BUILD_LOG=1 || \
+          make target/compile -j16 IGNORE_ERRORS="m n" BUILD_LOG=1 || \
             yes n | make target/compile -j1 V=s IGNORE_ERRORS=1
 
       - name: Compile Packages
         timeout-minutes: 240
         run: |
           cd $OPENWRT_ROOT_PATH
-          make package/compile -j$(nproc) IGNORE_ERRORS="y m n" BUILD_LOG=1
+          make package/compile -j16 IGNORE_ERRORS="y m n" BUILD_LOG=1
 
       - name: Generate Packages Index
         run: |

@@ -86,7 +86,7 @@ jobs:
           export OPENWRT_BRANCH="master openwrt-18.06 openwrt-19.07 openwrt-21.02 lede-17.01"
           export IMMORTALWRT_BRANCH="master openwrt-18.06 openwrt-18.06-k5.4 openwrt-21.02"
           export COOLSNOWWOLF_BRANCH="master"
-          export LIENOL_BRANCH="main 19.07 21.02 22.03"
+          export LIENOL_BRANCH="19.07 21.02 22.03"
 
           if [ $REPO_USER == openwrt ]
           then

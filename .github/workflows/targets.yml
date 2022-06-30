@@ -303,6 +303,7 @@ jobs:
           cat $GITHUB_WORKSPACE/config/targets.config >> .config
           if echo $DEVICE_TARGET | grep -q x86; then
             cat $GITHUB_WORKSPACE/config/x86.config >> .config
+            sed -i 's/kmod-igb /kmod-igb kmod-igc /g' target/linux/x86/Makefile
           fi
           echo -e "\n---- Original Config Start ----\n"
           cat .config

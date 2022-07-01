@@ -303,7 +303,7 @@ jobs:
           cat $GITHUB_WORKSPACE/config/targets.config >> .config
           if echo $DEVICE_TARGET | grep -q x86; then
             cat $GITHUB_WORKSPACE/config/x86.config >> .config
-            sed -i 's/kmod-igb /kmod-igb kmod-igc /g' target/linux/x86/Makefile
+            sed -i 's/kmod-igbvf/kmod-igbvf kmod-igc/g' target/linux/x86/Makefile
           fi
           echo -e "\n---- Original Config Start ----\n"
           cat .config
@@ -449,7 +449,7 @@ jobs:
           sudo wget -q -O /bin/b2 https://github.com/Backblaze/B2_Command_Line_Tool/releases/latest/download/b2-linux
           sudo chmod +x /bin/b2
           b2 authorize-account $B2_APPLICATION_KEY_ID $B2_APPLICATION_KEY
-          b2 sync --noProgress --threads 16 --keepDays 7 --replaceNewer --excludeRegex '(.*kmods)' $SOURCE_TARGETS $DEST_TARGETS
+          b2 sync --noProgress --threads 16 --keepDays 7 --replaceNewer --excludeDirRegex 'kmods' $SOURCE_TARGETS $DEST_TARGETS
           b2 sync --noProgress --threads 16 --keepDays 7 --replaceNewer $SOURCE_TARGETS/kmods/$KERNEL_VERSION $DEST_TARGETS/kmods/$KERNEL_VERSION
 
       - name: Deploy FailLogs To Backblaze

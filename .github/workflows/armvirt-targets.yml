@@ -411,6 +411,7 @@ jobs:
           sudo parted -s $UEFI_IMAGE_NAME mkpart primary ext4 100M 100%
           export UEFI_IMAGE_DEVNAME=$(sudo losetup -Pf --show ./$UEFI_IMAGE_NAME)
           sudo mkfs.vfat ${UEFI_IMAGE_DEVNAME}p1
+          gunzip -c immortalwrt-${DEVICE_TARGET}-${DEVICE_SUBTARGET}-rootfs-ext4.img.gz > immortalwrt-${DEVICE_TARGET}-${DEVICE_SUBTARGET}-rootfs-ext4.img
           sudo dd if=immortalwrt-${DEVICE_TARGET}-${DEVICE_SUBTARGET}-rootfs-ext4.img of=${UEFI_IMAGE_DEVNAME}p2 bs=1M
           sudo resize2fs ${UEFI_IMAGE_DEVNAME}p2
 

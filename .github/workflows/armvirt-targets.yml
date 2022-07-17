@@ -418,8 +418,8 @@ jobs:
       - name: Install ARM64 GRUB To Host
         run: |
           sudo dpkg --add-architecture arm64
-          sudo mv /etc/apt/source.list /etc/apt/source.list.bak
-          sudo cp data/sources.list /etc/apt/source.list
+          sudo mv /etc/apt/sources.list /etc/apt/sources.list.bak
+          sudo cp data/sources.list /etc/apt/sources.list
           sudo -E apt-get -qq update
           sudo -E apt-get -qq install grub-efi-arm64-bin
 

@@ -36,7 +36,7 @@ jobs:
           sudo -E apt-get -qq update
           sudo -E apt-get -qq install rdfind $(curl -fsSL git.io/depends-ubuntu-2004)
           sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -y purge azure* dotnet* firefox ghc* google* hhvm llvm* mono* mysql* openjdk* php* zulu* powershell* msodbc*
+          sudo -E apt-get -y purge dotnet* firefox ghc* google* hhvm llvm* mono* mysql* openjdk* php* zulu* powershell* msodbc*
           sudo -E apt-get -qq clean
           sudo -E rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /etc/mysql /etc/php /usr/local/share/boost
           sudo -E snap set system refresh.retain=2

@@ -210,7 +210,7 @@ jobs:
         if: env.B2_APPLICATION_KEY != null && env.B2_APPLICATION_KEY_ID != null
         run: |
           b2 authorize-account $B2_APPLICATION_KEY_ID $B2_APPLICATION_KEY
-          b2 sync --noProgress --threads 32 --keepDays 7 --replaceNewer $SOURCE_PACKAGES $DEST_PACKAGES
+          b2 sync --noProgress --threads 32 --replaceNewer $SOURCE_PACKAGES $DEST_PACKAGES
 
       - name: Deploy FailLogs To Backblaze
         continue-on-error: true
@@ -222,7 +222,7 @@ jobs:
         if: env.B2_APPLICATION_KEY != null && env.B2_APPLICATION_KEY_ID != null
         run: |
           b2 authorize-account $B2_APPLICATION_KEY_ID $B2_APPLICATION_KEY
-          b2 sync --noProgress --threads 32 --keepDays 7 --replaceNewer $SOURCE_FAILLOGS $DEST_FAILLOGS
+          b2 sync --noProgress --threads 32 --replaceNewer $SOURCE_FAILLOGS $DEST_FAILLOGS
 
       - name: Deploy Files To Server
         continue-on-error: true

@@ -112,7 +112,7 @@ jobs:
           sudo chown -R runner:runner $GITHUB_WORKSPACE
           mkdir -p $GITHUB_WORKSPACE/tmp
           chmod 777 $GITHUB_WORKSPACE/tmp
-          sudo cp -rp /tmp/* $GITHUB_WORKSPACE/tmp
+          sudo cp -rp /tmp/* $GITHUB_WORKSPACE/tmp || true
           sudo mount -B $GITHUB_WORKSPACE/tmp /tmp
 
       - name: Print Disk Usage Information
@@ -402,20 +402,18 @@ jobs:
       - name: Create UEFI Support Image
         run: |
           cd $OPENWRT_ROOT_PATH/bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET
-          export UEFI_IMAGE_NAME="immortalwrt-${DEVICE_TARGET}-${DEVICE_SUBTARGET}-rootfs-ext4-efi.img"
-          echo "UEFI_IMAGE_NAME=$UEFI_IMAGE_NAME" >> $GITHUB_ENV
-          dd if=/dev/zero of=${UEFI_IMAGE_NAME} bs=1M count=1024
-          sudo parted -s $UEFI_IMAGE_NAME mklabel gpt
-          sudo parted -s $UEFI_IMAGE_NAME mkpart ESP fat32 1M 100M
-          sudo parted -s $UEFI_IMAGE_NAME set 1 boot on
-          sudo parted -s $UEFI_IMAGE_NAME mkpart primary ext4 100M 100%
-          export UEFI_IMAGE_DEVNAME=$(sudo losetup -Pf --show ./$UEFI_IMAGE_NAME)
-          echo "UEFI_IMAGE_DEVNAME=$UEFI_IMAGE_DEVNAME" >> $GITHUB_ENV
-          sudo mkfs.vfat ${UEFI_IMAGE_DEVNAME}p1
-          gunzip -c immortalwrt-${DEVICE_TARGET}-${DEVICE_SUBTARGET}-rootfs-ext4.img.gz > immortalwrt-${DEVICE_TARGET}-${DEVICE_SUBTARGET}-rootfs-ext4.img
-          sudo dd if=immortalwrt-${DEVICE_TARGET}-${DEVICE_SUBTARGET}-rootfs-ext4.img of=${UEFI_IMAGE_DEVNAME}p2 bs=1M
-          rm immortalwrt-${DEVICE_TARGET}-${DEVICE_SUBTARGET}-rootfs-ext4.img
-          sudo resize2fs ${UEFI_IMAGE_DEVNAME}p2
+          export UEFI_IMAGE="immortalwrt-${DEVICE_TARGET}-${DEVICE_SUBTARGET}-generic-ext4-efi.img"
+          echo "UEFI_IMAGE=$UEFI_IMAGE" >> $GITHUB_ENV
+          dd if=/dev/zero of=${UEFI_IMAGE} bs=1M count=1024
+          sudo parted -s $UEFI_IMAGE mklabel gpt
+          sudo parted -s $UEFI_IMAGE mkpart ESP fat32 1M 100M
+          sudo parted -s $UEFI_IMAGE set 1 boot on
+          sudo parted -s $UEFI_IMAGE mkpart primary ext4 100M 100%
+          export UEFI_IMAGE_DEVICE=$(sudo losetup -Pf --show ./$UEFI_IMAGE)
+          echo "UEFI_IMAGE_DEVICE=$UEFI_IMAGE_DEVICE" >> $GITHUB_ENV
+          sudo mkfs.vfat ${UEFI_IMAGE_DEVICE}p1
+          sudo gunzip -c immortalwrt-${DEVICE_TARGET}-${DEVICE_SUBTARGET}-rootfs-ext4.img.gz > ${UEFI_IMAGE_DEVICE}p2
+          sudo resize2fs ${UEFI_IMAGE_DEVICE}p2
 
       - name: Install ARM64 GRUB To Host
         run: |
@@ -427,11 +425,11 @@ jobs:
 
       - name: Generate EFI Executable
         run: |
-          export UEFI_IMAGE_PART1_UUID=$(lsblk -o UUID ${UEFI_IMAGE_DEVNAME}p1 | grep -)
-          export UEFI_IMAGE_PART2_PARTUUID=$(lsblk -o PARTUUID ${UEFI_IMAGE_DEVNAME}p2 | grep -)
+          export UEFI_IMAGE_PART1_UUID=$(lsblk -o UUID ${UEFI_IMAGE_DEVICE}p1 | grep -)
+          export UEFI_IMAGE_PART2_PARTUUID=$(lsblk -o PARTUUID ${UEFI_IMAGE_DEVICE}p2 | grep -)
           sed -i "s/UEFI_IMAGE_PART1_UUID/$UEFI_IMAGE_PART1_UUID/g" data/grub-early.cfg
           mkdir -p $GITHUB_WORKSPACE/esp
-          sudo mount ${UEFI_IMAGE_DEVNAME}p1 $GITHUB_WORKSPACE/esp
+          sudo mount ${UEFI_IMAGE_DEVICE}p1 $GITHUB_WORKSPACE/esp
           sudo mkdir -p $GITHUB_WORKSPACE/esp/EFI/BOOT
           cd $GITHUB_WORKSPACE/esp/EFI/BOOT
           sudo grub-mkimage -c $GITHUB_WORKSPACE/data/grub-early.cfg -p /boot -o BOOTAA64.EFI -O arm64-efi boot chain configfile fat linux ls part_gpt reboot serial efi_gop search_fs_uuid
@@ -443,8 +441,8 @@ jobs:
           sudo cp immortalwrt-${DEVICE_TARGET}-${DEVICE_SUBTARGET}-Image $GITHUB_WORKSPACE/esp/boot/vmlinuz
           sync
           sudo umount $GITHUB_WORKSPACE/esp
-          sudo losetup -d $UEFI_IMAGE_DEVNAME
-          gzip $UEFI_IMAGE_NAME
+          sudo losetup -d $UEFI_IMAGE_DEVICE
+          gzip $UEFI_IMAGE
 
       - name: Print Sha256sums
         run: |

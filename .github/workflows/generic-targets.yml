@@ -112,7 +112,7 @@ jobs:
           sudo chown -R runner:runner $GITHUB_WORKSPACE
           mkdir -p $GITHUB_WORKSPACE/tmp
           chmod 777 $GITHUB_WORKSPACE/tmp
-          sudo cp -rp /tmp/* $GITHUB_WORKSPACE/tmp
+          sudo cp -rp /tmp/* $GITHUB_WORKSPACE/tmp || true
           sudo mount -B $GITHUB_WORKSPACE/tmp /tmp
 
       - name: Print Disk Usage Information

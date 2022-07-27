@@ -412,7 +412,9 @@ jobs:
           export UEFI_IMAGE_DEVICE=$(sudo losetup -Pf --show ./$UEFI_IMAGE)
           echo "UEFI_IMAGE_DEVICE=$UEFI_IMAGE_DEVICE" >> $GITHUB_ENV
           sudo mkfs.vfat ${UEFI_IMAGE_DEVICE}p1
-          sudo gunzip -c immortalwrt-${DEVICE_TARGET}-${DEVICE_SUBTARGET}-rootfs-ext4.img.gz > ${UEFI_IMAGE_DEVICE}p2
+          gunzip -c immortalwrt-${DEVICE_TARGET}-${DEVICE_SUBTARGET}-rootfs-ext4.img.gz > immortalwrt-${DEVICE_TARGET}-${DEVICE_SUBTARGET}-rootfs-ext4.img
+          sudo dd if=immortalwrt-${DEVICE_TARGET}-${DEVICE_SUBTARGET}-rootfs-ext4.img of=${UEFI_IMAGE_DEVICE}p2 bs=1M
+          rm immortalwrt-${DEVICE_TARGET}-${DEVICE_SUBTARGET}-rootfs-ext4.img
           sudo resize2fs ${UEFI_IMAGE_DEVICE}p2
 
       - name: Install ARM64 GRUB To Host

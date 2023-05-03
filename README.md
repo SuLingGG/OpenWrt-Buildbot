@@ -1,6 +1,21 @@
 # [OpenWrt-Buildbot](https://github.com/SuLingGG/OpenWrt-Buildbot)
 
+## 仓库存档说明
+
+由于 18.06 版本已结束支持周期，且上游分支 [immortalwrt:openwrt-18.06-k5.4](https://github.com/immortalwrt/immortalwrt/tree/openwrt-18.06-k5.4) 已停止更新，
+
+故本仓库转为存档 (Archive) 状态，终止所有无意义的编译任务。
+
+现有软件源和固件不会被删除，你可以继续在 <https://openwrt.cc> 访问和下载到它们。
+
+欢迎使用 immortalwrt 项目的官方固件:
+
+<https://downloads.immortalwrt.org>
+
+感谢大家的支持和陪伴~
+
 ## 项目介绍
+
 1. 提供绝大多数源码支持的 arm/aarch64/x86 平台设备的 OpenWrt 固件
 2. 除设备默认定义软件包外，固件内未额外集成其他软件包，确保获得纯净体验
 3. 固件每日跟随源码更新自动编译，确保获得最新体验
